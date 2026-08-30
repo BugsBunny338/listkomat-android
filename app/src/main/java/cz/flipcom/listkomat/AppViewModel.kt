@@ -7,11 +7,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cz.flipcom.listkomat.data.ActiveTicketStore
 import cz.flipcom.listkomat.data.CatalogStore
+import cz.flipcom.listkomat.data.LocationService
 import cz.flipcom.listkomat.notify.TicketNotifications
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.ForeignSimNotice
+import cz.flipcom.listkomat.model.NearestCity
 import cz.flipcom.listkomat.model.Ticket
 import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
@@ -46,6 +48,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val noticePrefs =
         app.getSharedPreferences("foreign_sim_notice", Context.MODE_PRIVATE)
+
+    private val statePrefs =
+        app.getSharedPreferences("app_state", Context.MODE_PRIVATE)
+
+    /** Manual city selection, persisted. Null until the user picks one —
+     *  the GPS-nearest default the iOS app has is a future feature here. */
+    private val _selectedCityKey =
+        MutableStateFlow(statePrefs.getString("selected_city", null))
+    val selectedCityKey: StateFlow<String?> = _selectedCityKey
+
+    fun selectCity(key: String) {
+        statePrefs.edit().putString("selected_city", key).apply()
+        _selectedCityKey.value = key
+    }
+
+    /** GPS default, mirroring iOS: nearest supported city + distance, or a
+     *  denied/searching state. Manual selection always wins over this. */
+    sealed interface LocationState {
+        data object Idle : LocationState
+        data object Searching : LocationState
+        data object Denied : LocationState
+        data class Located(val cityKey: String, val distanceKm: Double) : LocationState
+    }
+
+    private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
+    val locationState: StateFlow<LocationState> = _locationState
+
+    fun onLocationPermission(granted: Boolean) {
+        if (!granted) {
+            _locationState.value = LocationState.Denied
+            return
+        }
+        _locationState.value = LocationState.Searching
+        viewModelScope.launch {
+            val fix = runCatching { LocationService.coarseFix(getApplication()) }.getOrNull()
+            val nearest = fix?.let { NearestCity.nearest(it.latitude, it.longitude, _catalog.value.cities) }
+            // No fix is NOT "denied" — iOS keeps the searching state (with the
+            // manual pick button right there) rather than blaming permissions.
+            if (nearest != null) {
+                _locationState.value = LocationState.Located(nearest.city.key, nearest.distanceKm)
+            }
+        }
+    }
 
     private val _simNoticeDismissed = MutableStateFlow(noticePrefs.getBoolean("dismissed", false))
     val simNoticeDismissed: StateFlow<Boolean> = _simNoticeDismissed

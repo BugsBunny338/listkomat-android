@@ -41,4 +41,19 @@
     <string name="sim_sheet_czech_body">Premium SMS is only handled by Czech operators (O2, T‑Mobile, Vodafone and their virtual networks). A prepaid card is enough.</string>
     <string name="sim_sheet_roaming_title">Foreign SIM while roaming</string>
     <string name="sim_sheet_roaming_body">The SMS usually seems to send, but the ticket never arrives. The app doesn\'t read incoming SMS, so it has no way to know — which is why we warn you up front.</string>
+    <string name="city_picker_title">Pick a city</string>
+    <string name="pick_city_button">Pick a city</string>
+    <string name="empty_pick_city">Pick the city you\'re in.</string>
+    <string name="primer_title">Find the nearest city</string>
+    <string name="primer_body">With location access, Lístkomat offers tickets for the city you\'re in right away. Your location never leaves the device. If you don\'t allow access, you can always pick a city manually.</string>
+    <string name="primer_continue">Continue</string>
+    <string name="empty_searching">Finding the nearest city…</string>
+    <string name="empty_denied">Location not allowed</string>
+    <string name="empty_far">No city nearby</string>
+    <string name="empty_far_subtitle">The nearest supported city (%1$s) is ~%2$d km away. Pick a city manually.</string>
+    <string name="footer_how">Tapping opens a prefilled SMS to %1$s. You buy the ticket by sending it.</string>
+    <string name="footer_sim">Works with a Czech SIM card.</string>
+    <string name="footer_sim_more">Learn more</string>
+    <string name="footer_prices_as_of">Prices as of %1$s</string>
+    <string name="footer_offline">Offline – showing the saved price list (as of %1$s)</string>
 </resources>

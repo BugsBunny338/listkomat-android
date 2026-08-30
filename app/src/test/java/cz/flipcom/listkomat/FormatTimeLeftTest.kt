@@ -13,3 +13,11 @@ class FormatTimeLeftTest {
         assertEquals("0:00", formatTimeLeft(-1_000))
     }
 }
+
+class CatalogDateFormatTest {
+    @Test
+    fun `iso date renders czech-style, garbage passes through`() {
+        org.junit.Assert.assertEquals("30. 8. 2026", cz.flipcom.listkomat.ui.formatCatalogDate("2026-08-30"))
+        org.junit.Assert.assertEquals("nonsense", cz.flipcom.listkomat.ui.formatCatalogDate("nonsense"))
+    }
+}

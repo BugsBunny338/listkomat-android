@@ -29,15 +29,19 @@ import cz.flipcom.listkomat.R
 import androidx.compose.ui.platform.LocalContext
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
 import cz.flipcom.listkomat.model.Ticket
 import java.util.Locale
 
 @Composable
 fun TicketListScreen(
     city: City,
+    updatedAt: String,
+    staleHint: Boolean,
     showSimNotice: Boolean,
     onDismissSimNotice: () -> Unit,
-    onBack: () -> Unit,
     onBuy: (Ticket) -> Unit,
 ) {
     val language = Locale.getDefault().language
@@ -50,12 +54,23 @@ fun TicketListScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Text(
-                city.name(language),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
+            ) {
+                cityIcons[city.key]?.let { icon ->
+                    Icon(
+                        painterResource(icon),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
+                Text(city.name(language), style = MaterialTheme.typography.headlineMedium)
+            }
         }
+
         if (showSimNotice) {
             item(key = "sim-notice") {
                 Card(
@@ -115,10 +130,27 @@ fun TicketListScreen(
                 }
             }
         }
-        item(key = "sim-footer") {
-            TextButton(onClick = { showingSheet = true }) {
-                Text(stringResource(R.string.sim_footer_link),
-                    style = MaterialTheme.typography.bodySmall)
+        item(key = "footer") {
+            Column(Modifier.padding(top = 8.dp)) {
+                val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(stringResource(R.string.footer_how, city.smsNumber),
+                    style = MaterialTheme.typography.bodySmall, color = secondary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.footer_sim),
+                        style = MaterialTheme.typography.bodySmall, color = secondary)
+                    TextButton(onClick = { showingSheet = true },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            start = 4.dp, top = 0.dp, end = 4.dp, bottom = 0.dp)) {
+                        Text(stringResource(R.string.footer_sim_more),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Text(
+                    if (staleHint) stringResource(R.string.footer_offline, formatCatalogDate(updatedAt))
+                    else stringResource(R.string.footer_prices_as_of, formatCatalogDate(updatedAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (staleHint) MaterialTheme.colorScheme.error else secondary,
+                )
             }
         }
     }
@@ -148,4 +180,14 @@ fun TicketListScreen(
             },
         )
     }
+}
+
+/** "2026-08-30" -> "30. 8. 2026", tolerant of anything else (shown verbatim). */
+internal fun formatCatalogDate(updatedAt: String): String {
+    val p = updatedAt.split("-")
+    if (p.size != 3) return updatedAt
+    val (y, m, d) = p
+    val di = d.toIntOrNull() ?: return updatedAt
+    val mi = m.toIntOrNull() ?: return updatedAt
+    return "$di. $mi. $y"
 }

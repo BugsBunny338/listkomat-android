@@ -45,4 +45,19 @@
     <string name="sim_sheet_czech_body">Prémiové SMS umí zpracovat jen čeští operátoři (O2, T‑Mobile, Vodafone a jejich virtuální sítě). Předplacená karta stačí.</string>
     <string name="sim_sheet_roaming_title">Zahraniční SIM v roamingu</string>
     <string name="sim_sheet_roaming_body">SMS se obvykle tváří, že odešla, ale lístek nedorazí. Aplikace příchozí SMS nečte, takže se to nemá jak dozvědět — proto raději upozorňujeme dopředu.</string>
+    <string name="city_picker_title">Vyberte město</string>
+    <string name="pick_city_button">Vybrat město</string>
+    <string name="empty_pick_city">Vyberte město, ve kterém jste.</string>
+    <string name="primer_title">Najít nejbližší město</string>
+    <string name="primer_body">S přístupem k poloze vám Lístkomat rovnou nabídne lístky pro město, ve kterém právě jste. Polohu nikam neodesíláme. Pokud přístup nepovolíte, můžete si město kdykoli vybrat ručně.</string>
+    <string name="primer_continue">Pokračovat</string>
+    <string name="empty_searching">Zjišťuji nejbližší město…</string>
+    <string name="empty_denied">Poloha není povolená</string>
+    <string name="empty_far">Žádné město v okolí</string>
+    <string name="empty_far_subtitle">Nejbližší podporované město (%1$s) je ~%2$d km daleko. Vyberte město ručně.</string>
+    <string name="footer_how">Po klepnutí se otevře předvyplněná SMS na číslo %1$s. Lístek koupíte jejím odesláním.</string>
+    <string name="footer_sim">Funguje s českou SIM kartou.</string>
+    <string name="footer_sim_more">Více</string>
+    <string name="footer_prices_as_of">Ceník platný k %1$s</string>
+    <string name="footer_offline">Offline – zobrazen uložený ceník (k %1$s)</string>
 </resources>
