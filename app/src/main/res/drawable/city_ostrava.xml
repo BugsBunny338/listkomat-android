@@ -7,6 +7,10 @@
     <path android:pathData="M46.84,114.88 L89.55,44.63 L103.56,58.64 L92.15,73.44 L104.69,88.9 L90.97,103.21 L106.55,114.88 L106.55,41.88" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
     <path android:pathData="M29.69,113.24 L73.7,41.88 L81.08,58.57 L64.64,59.88 L71.42,74.46 L55.38,73.56 L60.55,90.22 L44.81,91.05 L51.7,106.88 L35.32,106.21" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
     <path android:pathData="M2,113.34 L49.1,46.73 L53.61,57.39 L53.61,57.39 L42.7,59.89 L43.02,69.36 L33.97,71.78 L37.05,80.78 L24.7,81.24 L27.55,91.88 L18.58,94.1 L20.71,103.81 L11.04,104.36 L12.86,114.88 L64.64,41.88" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
-    <path android:pathData="M94,41s-4.55-9.06-15.11-8.78c0,0,54.62-.34,61.11.27S154,41,154,41H94V72" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
-    <path android:pathData="M78.89,32.22S64.85,32,58.67,47H132s5.59-8.78,22-6" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+    <group android:translateX="-33.45" android:translateY="-30.13">
+        <path android:pathData="M94,41s-4.55-9.06-15.11-8.78c0,0,54.62-.34,61.11.27S154,41,154,41H94V72" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+    </group>
+    <group android:translateX="-33.45" android:translateY="-30.13">
+        <path android:pathData="M78.89,32.22S64.85,32,58.67,47H132s5.59-8.78,22-6" android:strokeColor="#FFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+    </group>
 </vector>
