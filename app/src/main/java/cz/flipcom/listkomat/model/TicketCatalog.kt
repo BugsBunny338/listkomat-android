@@ -37,21 +37,24 @@ data class City(
     val liveMapDisabled: Boolean? = null,
     val i18n: Map<String, LocalizedOverrides>? = null,
 ) {
-    /** Display name for [language] (ISO 639-1), falling back to the Czech original. */
+    /** Display name for [language] (ISO 639-1), falling back to the Czech original.
+     *  Blank overrides fall back too — never render an empty string. */
     fun name(language: String): String =
-        i18n?.get(language)?.name ?: name
+        i18n?.get(language)?.name?.takeUnless { it.isBlank() } ?: name
 }
 
 @Serializable
 data class Ticket(
     val code: String,            // SMS body to send, e.g. "DPT42"
-    val duration: String,        // human label, e.g. "30 min", "24 h"
+    /** LEGACY — for pre-2.5 iOS builds only. Never display; format [durationMinutes]. */
+    val duration: String,
     val durationMinutes: Int,
     val priceKc: Int,
     val note: String? = null,    // e.g. "zlevněný", "vnitřní zóna"
     val i18n: Map<String, LocalizedOverrides>? = null,
 ) {
-    /** Note for [language] (ISO 639-1), falling back to the Czech original. */
+    /** Note for [language] (ISO 639-1), falling back to the Czech original.
+     *  Blank overrides fall back too — never render an empty string. */
     fun note(language: String): String? =
-        i18n?.get(language)?.note ?: note
+        i18n?.get(language)?.note?.takeUnless { it.isBlank() } ?: note
 }

@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cz.flipcom.listkomat.data.ActiveTicketStore
 import cz.flipcom.listkomat.data.CatalogStore
+import cz.flipcom.listkomat.notify.TicketNotifications
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
+import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.Ticket
 import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
@@ -64,7 +66,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ticket = ActiveTicket(
             cityKey = pending.city.key,
             cityName = pending.city.name,
-            ticketLabel = pending.ticket.duration,
+            ticketLabel = DurationFormat.format(getApplication(), pending.ticket.durationMinutes),
             priceKc = pending.ticket.priceKc,
             timeline = TicketTimeline.make(
                 sentAtMs = System.currentTimeMillis(),
@@ -73,6 +75,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         activeStore.save(ticket)
         _activeTicket.value = ticket
+        TicketNotifications.scheduleExpiry(getApplication(), ticket)
     }
 
     fun purchaseDismissed() {
@@ -85,11 +88,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val updated = current.copy(timeline = current.timeline.confirmed(System.currentTimeMillis()))
         activeStore.save(updated)
         _activeTicket.value = updated
+        TicketNotifications.scheduleExpiry(getApplication(), updated)
     }
 
     fun endTicket() {
         activeStore.clear()
         _activeTicket.value = null
+        TicketNotifications.cancelExpiry(getApplication())
     }
 
     private companion object {

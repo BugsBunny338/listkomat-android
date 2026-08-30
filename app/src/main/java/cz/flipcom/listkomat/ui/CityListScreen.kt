@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cz.flipcom.listkomat.R
+import androidx.compose.ui.platform.LocalContext
 import cz.flipcom.listkomat.model.City
+import cz.flipcom.listkomat.model.DurationFormat
 import java.util.Locale
 
 @Composable
@@ -28,6 +30,7 @@ fun CityListScreen(
     onCitySelected: (City) -> Unit,
 ) {
     val language = Locale.getDefault().language
+    val context = LocalContext.current
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -59,7 +62,9 @@ fun CityListScreen(
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Text(city.name(language), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        ticketSummary(city),
+                        city.tickets.joinToString(" · ") {
+                            DurationFormat.format(context, it.durationMinutes)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -68,7 +73,3 @@ fun CityListScreen(
         }
     }
 }
-
-/** e.g. "30 min · 90 min · 24 h · 72 h" */
-private fun ticketSummary(city: City): String =
-    city.tickets.joinToString(" · ") { it.duration }

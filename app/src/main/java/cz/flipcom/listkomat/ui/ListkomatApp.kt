@@ -1,8 +1,12 @@
 package cz.flipcom.listkomat.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -39,6 +43,18 @@ fun ListkomatApp(viewModel: AppViewModel) {
 
     var selectedCityKey by remember { mutableStateOf<String?>(null) }
     val selectedCity = catalog.cities.firstOrNull { it.key == selectedCityKey }
+
+    // Ask for notification permission (13+) exactly when it becomes useful:
+    // the user just started a countdown whose expiry we want to announce.
+    // Declining is respected — the alarm still fires, the post is just dropped.
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()) { /* result irrelevant */ }
+    val confirmPurchase = {
+        viewModel.purchaseConfirmed()
+        if (Build.VERSION.SDK_INT >= 33) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     ListkomatTheme {
         Scaffold { padding ->
@@ -79,7 +95,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
             SmsSentDialog(
                 city = pending.city,
                 ticket = pending.ticket,
-                onSent = viewModel::purchaseConfirmed,
+                onSent = confirmPurchase,
                 onNotSent = viewModel::purchaseDismissed,
             )
         }

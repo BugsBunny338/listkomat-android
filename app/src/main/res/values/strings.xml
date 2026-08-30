@@ -18,4 +18,19 @@
     <string name="ticket_expired">Jízdenka vypršela</string>
     <string name="stale_prices_hint">Nepodařilo se ověřit aktuální ceny — zobrazené ceny mohou být zastaralé.</string>
     <string name="no_sms_app">Nenašla se žádná aplikace pro SMS.</string>
+    <string name="notification_channel_ticket">Jízdenka</string>
+    <string name="notification_expired_title">Jízdenka vypršela</string>
+    <string name="notification_expired_body">Platnost jízdenky skončila.</string>
+    <plurals name="duration_minutes">
+        <item quantity="one">%d minutu</item>
+        <item quantity="few">%d minuty</item>
+        <item quantity="many">%d minuty</item>
+        <item quantity="other">%d minut</item>
+    </plurals>
+    <plurals name="duration_hours">
+        <item quantity="one">%d hodinu</item>
+        <item quantity="few">%d hodiny</item>
+        <item quantity="many">%d hodiny</item>
+        <item quantity="other">%d hodin</item>
+    </plurals>
 </resources>

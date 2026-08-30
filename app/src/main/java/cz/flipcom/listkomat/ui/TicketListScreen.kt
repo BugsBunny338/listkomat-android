@@ -26,7 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cz.flipcom.listkomat.R
+import androidx.compose.ui.platform.LocalContext
 import cz.flipcom.listkomat.model.City
+import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.Ticket
 import java.util.Locale
 
@@ -37,6 +39,7 @@ fun TicketListScreen(
     onBuy: (Ticket) -> Unit,
 ) {
     val language = Locale.getDefault().language
+    val context = LocalContext.current
     var confirming by remember { mutableStateOf<Ticket?>(null) }
 
     LazyColumn(
@@ -63,7 +66,8 @@ fun TicketListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
-                        Text(ticket.duration, style = MaterialTheme.typography.titleMedium)
+                        Text(DurationFormat.format(context, ticket.durationMinutes),
+                            style = MaterialTheme.typography.titleMedium)
                         ticket.note(language)?.let {
                             Text(
                                 it,

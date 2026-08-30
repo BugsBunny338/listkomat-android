@@ -56,4 +56,13 @@ class CatalogParsingTest {
         assertEquals("o víkendu 90 min", praha.tickets[1].note("cs"))
         assertNull(praha.tickets[0].note("en"))
     }
+
+    @Test
+    fun `blank i18n override falls back to Czech, never blank`() {
+        val blank = """{ "version": 1, "updatedAt": "x", "cities": [
+          { "key": "praha", "name": "Praha", "lat": 1, "lng": 2, "smsNumber": "90206",
+            "i18n": { "en": { "name": "" } }, "tickets": [] } ] }"""
+        val praha = json.decodeFromString<TicketCatalog>(blank).cities.single()
+        assertEquals("Praha", praha.name("en"))
+    }
 }

@@ -18,4 +18,15 @@
     <string name="ticket_expired">Ticket expired</string>
     <string name="stale_prices_hint">Couldn\'t verify current prices — the prices shown may be out of date.</string>
     <string name="no_sms_app">No SMS app found.</string>
+    <string name="notification_channel_ticket">Ticket</string>
+    <string name="notification_expired_title">Ticket expired</string>
+    <string name="notification_expired_body">Your ticket is no longer valid.</string>
+    <plurals name="duration_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="duration_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
 </resources>
