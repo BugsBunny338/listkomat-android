@@ -6,7 +6,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -101,9 +100,4 @@ private fun SmsSentDialog(city: City, ticket: Ticket, onSent: () -> Unit, onNotS
             TextButton(onClick = onNotSent) { Text(stringResource(R.string.sms_sent_no)) }
         },
     )
-}
-
-@Composable
-fun ListkomatTheme(content: @Composable () -> Unit) {
-    MaterialTheme(content = content)
 }

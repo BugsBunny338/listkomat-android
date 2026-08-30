@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +51,8 @@ fun ActiveTicketBanner(
     val expired = ticket.timeline.isExpired(now)
 
     Card(
-        Modifier.fillMaxWidth().padding(16.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (expired) MaterialTheme.colorScheme.surfaceVariant
                              else MaterialTheme.colorScheme.primaryContainer),
@@ -77,7 +79,7 @@ fun ActiveTicketBanner(
                     else -> {
                         Text(
                             formatTimeLeft(ticket.timeline.endMs - now),
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.headlineMedium,
                         )
                         Text(
                             stringResource(R.string.ticket_valid_until,

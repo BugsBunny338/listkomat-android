@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,11 +47,16 @@ fun TicketListScreen(
             Text(
                 city.name(language),
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
+                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
         }
         items(city.tickets, key = { it.code }) { ticket ->
-            Card(Modifier.fillMaxWidth().clickable { confirming = ticket }) {
+            Card(
+                Modifier.fillMaxWidth().clickable { confirming = ticket },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
                 Row(
                     Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -68,6 +75,7 @@ fun TicketListScreen(
                     Text(
                         stringResource(R.string.price_format, ticket.priceKc),
                         style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
