@@ -29,4 +29,16 @@
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
     </plurals>
+    <string name="sim_notice_title">You need a Czech SIM</string>
+    <string name="sim_notice_body">Premium SMS only works with Czech operators. From a foreign SIM the message usually seems to send, but the ticket never arrives.</string>
+    <string name="sim_notice_more">Learn more</string>
+    <string name="sim_notice_dismiss">Got it</string>
+    <string name="sim_footer_link">How does SMS payment work?</string>
+    <string name="sim_sheet_title">SMS payment</string>
+    <string name="sim_sheet_how_title">How buying works</string>
+    <string name="sim_sheet_how_body">You buy a ticket by sending a prefilled SMS. Your mobile operator bills it — you don\'t pay through Google Play.</string>
+    <string name="sim_sheet_czech_title">You need a Czech SIM card</string>
+    <string name="sim_sheet_czech_body">Premium SMS is only handled by Czech operators (O2, T‑Mobile, Vodafone and their virtual networks). A prepaid card is enough.</string>
+    <string name="sim_sheet_roaming_title">Foreign SIM while roaming</string>
+    <string name="sim_sheet_roaming_body">The SMS usually seems to send, but the ticket never arrives. The app doesn\'t read incoming SMS, so it has no way to know — which is why we warn you up front.</string>
 </resources>

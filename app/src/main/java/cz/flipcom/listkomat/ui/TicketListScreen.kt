@@ -35,12 +35,15 @@ import java.util.Locale
 @Composable
 fun TicketListScreen(
     city: City,
+    showSimNotice: Boolean,
+    onDismissSimNotice: () -> Unit,
     onBack: () -> Unit,
     onBuy: (Ticket) -> Unit,
 ) {
     val language = Locale.getDefault().language
     val context = LocalContext.current
     var confirming by remember { mutableStateOf<Ticket?>(null) }
+    var showingSheet by remember { mutableStateOf(false) }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -52,6 +55,34 @@ fun TicketListScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = 12.dp, bottom = 12.dp),
             )
+        }
+        if (showSimNotice) {
+            item(key = "sim-notice") {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer),
+                ) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(stringResource(R.string.sim_notice_title),
+                            style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.sim_notice_body),
+                            style = MaterialTheme.typography.bodySmall)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            TextButton(onClick = { showingSheet = true }) {
+                                Text(stringResource(R.string.sim_notice_more))
+                            }
+                            TextButton(onClick = onDismissSimNotice) {
+                                Text(stringResource(R.string.sim_notice_dismiss))
+                            }
+                        }
+                    }
+                }
+            }
         }
         items(city.tickets, key = { it.code }) { ticket ->
             Card(
@@ -84,6 +115,16 @@ fun TicketListScreen(
                 }
             }
         }
+        item(key = "sim-footer") {
+            TextButton(onClick = { showingSheet = true }) {
+                Text(stringResource(R.string.sim_footer_link),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+
+    if (showingSheet) {
+        SimRequirementSheet(onDismiss = { showingSheet = false })
     }
 
     confirming?.let { ticket ->

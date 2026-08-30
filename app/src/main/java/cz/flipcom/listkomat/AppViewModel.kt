@@ -1,6 +1,8 @@
 package cz.flipcom.listkomat
 
 import android.app.Application
+import android.content.Context
+import android.telephony.TelephonyManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cz.flipcom.listkomat.data.ActiveTicketStore
@@ -9,6 +11,7 @@ import cz.flipcom.listkomat.notify.TicketNotifications
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
+import cz.flipcom.listkomat.model.ForeignSimNotice
 import cz.flipcom.listkomat.model.Ticket
 import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
@@ -40,6 +43,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pendingPurchase: StateFlow<PendingPurchase?> = _pendingPurchase
 
     data class PendingPurchase(val city: City, val ticket: Ticket)
+
+    private val noticePrefs =
+        app.getSharedPreferences("foreign_sim_notice", Context.MODE_PRIVATE)
+
+    private val _simNoticeDismissed = MutableStateFlow(noticePrefs.getBoolean("dismissed", false))
+    val simNoticeDismissed: StateFlow<Boolean> = _simNoticeDismissed
+
+    /** ISO country of the SIM, lowercase, or "" when there is none (emulator). */
+    val simCountryIso: String =
+        runCatching { app.getSystemService(TelephonyManager::class.java)?.simCountryIso }
+            .getOrNull().orEmpty()
+
+    fun shouldShowSimNotice(uiLanguage: String?): Boolean =
+        ForeignSimNotice.shouldShow(uiLanguage, simCountryIso, _simNoticeDismissed.value)
+
+    fun dismissSimNotice() {
+        noticePrefs.edit().putBoolean("dismissed", true).apply()
+        _simNoticeDismissed.value = true
+    }
 
     init {
         _catalog.value = catalogStore.loadCachedOrBundled()

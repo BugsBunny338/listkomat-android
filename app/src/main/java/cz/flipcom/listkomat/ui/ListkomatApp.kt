@@ -27,6 +27,7 @@ import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.SmsPurchase
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.Ticket
+import java.util.Locale
 
 /**
  * Single-activity app: city list → ticket list, with the active-ticket banner
@@ -74,8 +75,13 @@ fun ListkomatApp(viewModel: AppViewModel) {
                     )
                 } else {
                     BackHandler { selectedCityKey = null }
+                    // collected so a dismissal recomposes this screen immediately
+                    val simNoticeDismissed by viewModel.simNoticeDismissed.collectAsState()
                     TicketListScreen(
                         city = selectedCity,
+                        showSimNotice = !simNoticeDismissed &&
+                            viewModel.shouldShowSimNotice(Locale.getDefault().language),
+                        onDismissSimNotice = viewModel::dismissSimNotice,
                         onBack = { selectedCityKey = null },
                         onBuy = { ticket ->
                             try {

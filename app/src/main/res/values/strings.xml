@@ -33,4 +33,16 @@
         <item quantity="many">%d hodiny</item>
         <item quantity="other">%d hodin</item>
     </plurals>
+    <string name="sim_notice_title">Potřebujete českou SIM</string>
+    <string name="sim_notice_body">Prémiové SMS umí zpracovat jen čeští operátoři. Ze zahraniční SIM se zpráva obvykle tváří, že odešla, ale lístek nedorazí.</string>
+    <string name="sim_notice_more">Více</string>
+    <string name="sim_notice_dismiss">Rozumím</string>
+    <string name="sim_footer_link">Jak funguje placení SMS?</string>
+    <string name="sim_sheet_title">Placení SMS</string>
+    <string name="sim_sheet_how_title">Jak nákup funguje</string>
+    <string name="sim_sheet_how_body">Lístek koupíte odesláním předvyplněné SMS. Platbu vyúčtuje váš mobilní operátor, neplatíte přes Google Play.</string>
+    <string name="sim_sheet_czech_title">Potřebujete českou SIM kartu</string>
+    <string name="sim_sheet_czech_body">Prémiové SMS umí zpracovat jen čeští operátoři (O2, T‑Mobile, Vodafone a jejich virtuální sítě). Předplacená karta stačí.</string>
+    <string name="sim_sheet_roaming_title">Zahraniční SIM v roamingu</string>
+    <string name="sim_sheet_roaming_body">SMS se obvykle tváří, že odešla, ale lístek nedorazí. Aplikace příchozí SMS nečte, takže se to nemá jak dozvědět — proto raději upozorňujeme dopředu.</string>
 </resources>
