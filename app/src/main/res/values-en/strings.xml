@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lístkomat</string>
+    <string name="cities_title">Where are you?</string>
+    <string name="price_format">%1$d CZK</string>
+    <string name="buy_confirm_title">Buy a ticket?</string>
+    <string name="buy_confirm_message">A premium SMS “%1$s” will be sent to %2$s for %3$d CZK. The price is charged to your mobile account.</string>
+    <string name="buy_confirm_send">Continue</string>
+    <string name="cancel">Cancel</string>
+    <string name="sms_sent_title">Did you send the SMS?</string>
+    <string name="sms_sent_message">If you sent the ticket SMS, we\'ll start the validity countdown.</string>
+    <string name="sms_sent_yes">Yes, sent</string>
+    <string name="sms_sent_no">No</string>
+    <string name="pending_confirmation">Waiting for confirmation…</string>
+    <string name="confirm_now">Confirm now</string>
+    <string name="ticket_valid_until">Valid until %1$s</string>
+    <string name="end_ticket">End ticket</string>
+    <string name="ticket_expired">Ticket expired</string>
+    <string name="stale_prices_hint">Couldn\'t verify current prices — the prices shown may be out of date.</string>
+    <string name="no_sms_app">No SMS app found.</string>
+</resources>

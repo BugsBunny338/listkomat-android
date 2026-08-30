@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lístkomat</string>
+    <string name="cities_title">Kde jste?</string>
+    <string name="price_format">%1$d Kč</string>
+    <string name="buy_confirm_title">Koupit jízdenku?</string>
+    <string name="buy_confirm_message">Odešle se prémiová SMS „%1$s“ na číslo %2$s za %3$d Kč. Cena se strhne z vašeho mobilního účtu.</string>
+    <string name="buy_confirm_send">Pokračovat</string>
+    <string name="cancel">Zrušit</string>
+    <string name="sms_sent_title">Odeslali jste SMS?</string>
+    <string name="sms_sent_message">Pokud jste jízdenku odeslali, spustíme odpočet platnosti.</string>
+    <string name="sms_sent_yes">Ano, odesláno</string>
+    <string name="sms_sent_no">Ne</string>
+    <string name="pending_confirmation">Čeká na potvrzení…</string>
+    <string name="confirm_now">Potvrdit nyní</string>
+    <string name="ticket_valid_until">Platí do %1$s</string>
+    <string name="end_ticket">Ukončit</string>
+    <string name="ticket_expired">Jízdenka vypršela</string>
+    <string name="stale_prices_hint">Nepodařilo se ověřit aktuální ceny — zobrazené ceny mohou být zastaralé.</string>
+    <string name="no_sms_app">Nenašla se žádná aplikace pro SMS.</string>
+</resources>
