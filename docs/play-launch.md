@@ -21,8 +21,13 @@ agent can automate once the account exists.
    email list. (Verify the exact tester count in the console; Google tweaks it.)
 5. **App signing**: accept Play App Signing (default). We'll upload an AAB
    signed with an upload key the agent can generate locally.
-6. When the map graduates from OSM tiles to Google Maps (optional): create a
-   Maps SDK API key in Google Cloud Console — until then no key is needed.
+6. **Google Maps API key** (recommended — this is what makes the live map
+   pretty): in Google Cloud Console create a project, enable *Maps SDK for
+   Android*, create an API key restricted to the app's package name +
+   signing-cert SHA-1. The free monthly credit comfortably covers a personal
+   app. Until then the map uses OSM tiles (functional but visually loud —
+   Carto's clean tiles turned out to watermark without a key, tried
+   2026-08-31). The swap is contained to `ui/LiveMapScreen.kt`.
 
 ## What the agent can do once the account exists
 
