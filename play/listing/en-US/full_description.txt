@@ -1,0 +1,20 @@
+A public-transport ticket in one text message. No sign-up, no credit top-ups, no internet needed.
+
+Lístkomat remembers the phone numbers and SMS codes for transit tickets in 10 Czech cities. Pick a ticket, the app prefills the SMS, you just send it — the ticket arrives right back and the price lands on your operator's bill.
+
+WHY LÍSTKOMAT
+• No registration, no account — open it and buy
+• No credit top-ups — billed by your mobile operator
+• Works without internet — an SMS signal is enough
+• 10 cities in one app: Prague, Brno, Ostrava, Plzeň, Liberec, Olomouc, Ústí nad Labem, Hradec Králové, České Budějovice and Pardubice
+
+SMART TOUCHES
+• Location-aware: the app offers tickets for the city you're in (your location never leaves the device)
+• Ticket-expiry notification
+• Live transit map for Prague and Brno — trams, buses and trolleybuses in real time
+• Optional visual themes
+
+GOOD TO KNOW
+• SMS tickets require a Czech SIM card (premium SMS billed by your operator)
+• Price lists update automatically; the last known prices work offline too
+• No analytics, no tracking — the app collects no data

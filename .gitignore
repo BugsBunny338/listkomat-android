@@ -5,3 +5,7 @@ local.properties
 *.iml
 .idea/
 .kotlin/
+
+# signing material — never commit
+upload-keystore.jks
+keystore.properties
