@@ -79,6 +79,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
     var showingPrimer by remember { mutableStateOf(false) }
     var showingTheme by remember { mutableStateOf(false) }
     var showingMap by remember { mutableStateOf(false) }
+    var showingNoSms by remember { mutableStateOf(false) }
     var rainNonce by remember { mutableStateOf(0) }
 
     val themeId by viewModel.themeId.collectAsState()
@@ -108,6 +109,23 @@ fun ListkomatApp(viewModel: AppViewModel) {
         viewModel.purchaseConfirmed()
         if (Build.VERSION.SDK_INT >= 33) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // Status-bar icons must follow what's painted behind them: the band's
+    // darkness when there is one, the surface darkness otherwise.
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val surfaceDark = when (appearance) {
+        AppearanceMode.LIGHT -> false
+        AppearanceMode.DARK -> true
+        AppearanceMode.SYSTEM -> systemDark
+    }
+    val view = androidx.compose.ui.platform.LocalView.current
+    val wantLightIcons = if (theme.band != null) theme.isDark else surfaceDark
+    androidx.compose.runtime.LaunchedEffect(wantLightIcons) {
+        (view.context as? android.app.Activity)?.window?.let { window ->
+            androidx.core.view.WindowCompat.getInsetsController(window, view)
+                .isAppearanceLightStatusBars = !wantLightIcons
         }
     }
 
@@ -171,7 +189,12 @@ fun ListkomatApp(viewModel: AppViewModel) {
                         onDismissSimNotice = viewModel::dismissSimNotice,
                         onOpenMap = { showingMap = true },
                         onBuy = { ticket ->
-                            try {
+                            // iOS parity: a device that can't send SMS at all (wifi
+                            // tablet) gets an explanation, not a dead intent.
+                            if (!context.packageManager.hasSystemFeature(
+                                    android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
+                                showingNoSms = true
+                            } else try {
                                 context.startActivity(
                                     SmsPurchase.intent(currentCity.smsNumber, ticket.code))
                                 viewModel.smsHandedOff(currentCity, ticket)
@@ -195,6 +218,16 @@ fun ListkomatApp(viewModel: AppViewModel) {
                     LiveMapScreen(city = currentCity)
                 }
             }
+        }
+        if (showingNoSms) {
+            AlertDialog(
+                onDismissRequest = { showingNoSms = false },
+                title = { Text(stringResource(R.string.sms_impossible_title)) },
+                text = { Text(stringResource(R.string.sms_impossible_body)) },
+                confirmButton = {
+                    TextButton(onClick = { showingNoSms = false }) { Text("OK") }
+                },
+            )
         }
         RainOverlay(trigger = rainNonce, mascot = theme.mascot)
         if (showingTheme) {

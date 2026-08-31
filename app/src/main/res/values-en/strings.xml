@@ -80,4 +80,7 @@
     <string name="kind_ferry">Ferry</string>
     <string name="map_sources_brno">Vehicle data: city of Brno / KORDIS JMK (data.brno.cz). Map: © OpenStreetMap contributors.</string>
     <string name="map_sources_praha">Vehicle data: Golemio / PID (CC-BY). Map: © OpenStreetMap contributors.</string>
+    <string name="map_sources_title">Data sources</string>
+    <string name="sms_impossible_title">Can\'t send SMS</string>
+    <string name="sms_impossible_body">This device can\'t send text messages (e.g. a tablet without a SIM).</string>
 </resources>

@@ -84,4 +84,7 @@
     <string name="kind_ferry">Přívoz</string>
     <string name="map_sources_brno">Data o vozidlech: statutární město Brno / KORDIS JMK (data.brno.cz). Mapa: © OpenStreetMap contributors.</string>
     <string name="map_sources_praha">Data o vozidlech: Golemio / PID (CC-BY). Mapa: © OpenStreetMap contributors.</string>
+    <string name="map_sources_title">Zdroje dat</string>
+    <string name="sms_impossible_title">SMS nelze odeslat</string>
+    <string name="sms_impossible_body">Toto zařízení neumí posílat SMS (např. tablet bez SIM).</string>
 </resources>
