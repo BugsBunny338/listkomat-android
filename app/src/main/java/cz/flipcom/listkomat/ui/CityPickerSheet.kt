@@ -16,6 +16,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,7 +43,12 @@ fun CityPickerSheet(
     onDismiss: () -> Unit,
 ) {
     val language = Locale.getDefault().language
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Full height on open — the grid is the whole point of the sheet and
+    // there's nothing to see behind it (Jiri's feedback on the half state).
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
         Text(
             stringResource(R.string.city_picker_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -69,15 +75,19 @@ fun CityPickerSheet(
 @Composable
 private fun CityTile(city: City, name: String, selected: Boolean, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // The whole tile — icon box AND label — is one target (tapping the
+    // city name must work too).
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
         androidx.compose.foundation.layout.Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .background(
                     if (selected) accent else accent.copy(alpha = 0.12f),
-                    RoundedCornerShape(16.dp))
-                .clickable(onClick = onClick),
+                    RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             cityIcons[city.key]?.let { icon ->

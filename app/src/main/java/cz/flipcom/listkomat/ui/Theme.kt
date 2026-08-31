@@ -11,6 +11,9 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import cz.flipcom.listkomat.R
+import cz.flipcom.listkomat.model.AppTheme
+import cz.flipcom.listkomat.model.AppearanceMode
+import cz.flipcom.listkomat.model.GlyphContrast
 
 /**
  * Lístkomat brand, ported from the iOS app (Shared/BrandColor.swift,
@@ -71,10 +74,38 @@ private val BrandTypography = Typography().let { t ->
     )
 }
 
+/** Blend [accent] over [base] the way a 12% tint composites on the surface. */
+private fun tintOver(base: Color, accent: Color, alpha: Float): Color = Color(
+    red = base.red + (accent.red - base.red) * alpha,
+    green = base.green + (accent.green - base.green) * alpha,
+    blue = base.blue + (accent.blue - base.blue) * alpha,
+    alpha = 1f,
+)
+
 @Composable
-fun ListkomatTheme(content: @Composable () -> Unit) {
+fun ListkomatTheme(
+    theme: AppTheme = AppTheme.default,
+    appearanceMode: AppearanceMode = AppearanceMode.SYSTEM,
+    content: @Composable () -> Unit,
+) {
+    val dark = when (appearanceMode) {
+        AppearanceMode.LIGHT -> false
+        AppearanceMode.DARK -> true
+        AppearanceMode.SYSTEM -> isSystemInDarkTheme()
+    }
+    val base = if (dark) DarkColors else LightColors
+    val accent = theme.accent
+    // The clean/black looks keep the tuned teal scheme; a coloured band re-tints
+    // the accent roles so the whole app reads as one theme (iOS parity).
+    val scheme = if (accent == Brand.teal) base else base.copy(
+        primary = accent,
+        onPrimary = GlyphContrast.readableGlyph(accent),
+        primaryContainer = tintOver(base.surface, accent, 0.14f),
+        onPrimaryContainer = base.onSurface,
+        secondary = accent,
+    )
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = scheme,
         typography = BrandTypography,
         content = content,
     )

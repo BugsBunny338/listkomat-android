@@ -37,6 +37,16 @@ data class City(
     val liveMapDisabled: Boolean? = null,
     val i18n: Map<String, LocalizedOverrides>? = null,
 ) {
+    /** True when this city has a live map. Prague's ships client-side (this
+     *  build has PragueLiveSource), so it enables itself rather than via the
+     *  catalog flag; Brno gates on the catalog. [liveMapDisabled] is the
+     *  remote kill switch for both (iOS parity). */
+    val showsLiveMap: Boolean get() {
+        if (liveMapDisabled == true) return false
+        if (key == "praha") return true
+        return hasLiveMap == true
+    }
+
     /** Display name for [language] (ISO 639-1), falling back to the Czech original.
      *  Blank overrides fall back too — never render an empty string. */
     fun name(language: String): String =

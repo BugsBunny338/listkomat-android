@@ -42,6 +42,7 @@ fun TicketListScreen(
     staleHint: Boolean,
     showSimNotice: Boolean,
     onDismissSimNotice: () -> Unit,
+    onOpenMap: () -> Unit,
     onBuy: (Ticket) -> Unit,
 ) {
     val language = Locale.getDefault().language
@@ -68,6 +69,20 @@ fun TicketListScreen(
                     )
                 }
                 Text(city.name(language), style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+        if (city.showsLiveMap) {
+            item(key = "live-map") {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onOpenMap,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                ) {
+                    Icon(painterResource(cz.flipcom.listkomat.R.drawable.ic_map),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.live_map_button),
+                        modifier = Modifier.padding(start = 8.dp))
+                }
             }
         }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -40,6 +41,8 @@ import cz.flipcom.listkomat.AppViewModel
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.SmsPurchase
 import cz.flipcom.listkomat.AppViewModel.LocationState
+import cz.flipcom.listkomat.model.AppTheme
+import cz.flipcom.listkomat.model.AppearanceMode
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.NearestCity
@@ -74,6 +77,14 @@ fun ListkomatApp(viewModel: AppViewModel) {
         ?: catalog.cities.firstOrNull { it.key == locatedKey }
     var showingPicker by remember { mutableStateOf(false) }
     var showingPrimer by remember { mutableStateOf(false) }
+    var showingTheme by remember { mutableStateOf(false) }
+    var showingMap by remember { mutableStateOf(false) }
+    var rainNonce by remember { mutableStateOf(0) }
+
+    val themeId by viewModel.themeId.collectAsState()
+    val appearanceRaw by viewModel.appearanceMode.collectAsState()
+    val theme = AppTheme.resolve(themeId)
+    val appearance = AppearanceMode.from(appearanceRaw)
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()) { granted ->
@@ -100,20 +111,38 @@ fun ListkomatApp(viewModel: AppViewModel) {
         }
     }
 
-    ListkomatTheme {
+    ListkomatTheme(theme = theme, appearanceMode = appearance) {
         Scaffold(
             topBar = {
+                val band = theme.band
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name)) },
+                    navigationIcon = {
+                        theme.mascot?.let { mascot ->
+                            IconButton(onClick = { rainNonce += 1 }) {
+                                Text(mascot, style = MaterialTheme.typography.titleLarge)
+                            }
+                        }
+                    },
                     actions = {
+                        IconButton(onClick = { showingTheme = true }) {
+                            Icon(Icons.Filled.Palette,
+                                contentDescription = stringResource(R.string.theme_button),
+                                tint = if (band != null) theme.onBand
+                                       else MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = { showingPicker = true }) {
                             Icon(Icons.Filled.Place,
                                 contentDescription = stringResource(R.string.pick_city_button),
-                                tint = MaterialTheme.colorScheme.primary)
+                                tint = if (band != null) theme.onBand
+                                       else MaterialTheme.colorScheme.primary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background),
+                        containerColor = band ?: MaterialTheme.colorScheme.background,
+                        titleContentColor = if (band != null) theme.onBand
+                                            else MaterialTheme.colorScheme.onBackground,
+                    ),
                 )
             },
         ) { padding ->
@@ -140,6 +169,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
                         showSimNotice = !simNoticeDismissed &&
                             viewModel.shouldShowSimNotice(Locale.getDefault().language),
                         onDismissSimNotice = viewModel::dismissSimNotice,
+                        onOpenMap = { showingMap = true },
                         onBuy = { ticket ->
                             try {
                                 context.startActivity(
@@ -153,6 +183,28 @@ fun ListkomatApp(viewModel: AppViewModel) {
                     )
                 }
             }
+        }
+        if (showingMap && currentCity != null) {
+            androidx.activity.compose.BackHandler { showingMap = false }
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showingMap = false },
+                properties = androidx.compose.ui.window.DialogProperties(
+                    usePlatformDefaultWidth = false),
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    LiveMapScreen(city = currentCity)
+                }
+            }
+        }
+        RainOverlay(trigger = rainNonce, mascot = theme.mascot)
+        if (showingTheme) {
+            ThemeSheet(
+                themeId = themeId,
+                appearanceMode = appearance,
+                onTheme = { viewModel.setTheme(it); showingTheme = false },
+                onAppearance = { viewModel.setAppearanceMode(it.name) },
+                onDismiss = { showingTheme = false },
+            )
         }
         if (showingPrimer) {
             LocationPrimer(onContinue = {

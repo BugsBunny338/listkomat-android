@@ -58,6 +58,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         MutableStateFlow(statePrefs.getString("selected_city", null))
     val selectedCityKey: StateFlow<String?> = _selectedCityKey
 
+    private val _themeId = MutableStateFlow(statePrefs.getString("theme_id", "clean") ?: "clean")
+    val themeId: StateFlow<String> = _themeId
+
+    private val _appearanceMode = MutableStateFlow(statePrefs.getString("appearance", null))
+    val appearanceMode: StateFlow<String?> = _appearanceMode
+
+    fun setTheme(id: String) {
+        statePrefs.edit().putString("theme_id", id).apply()
+        _themeId.value = id
+    }
+
+    fun setAppearanceMode(mode: String) {
+        statePrefs.edit().putString("appearance", mode).apply()
+        _appearanceMode.value = mode
+    }
+
     fun selectCity(key: String) {
         statePrefs.edit().putString("selected_city", key).apply()
         _selectedCityKey.value = key
