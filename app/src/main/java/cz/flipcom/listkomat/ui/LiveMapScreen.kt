@@ -99,9 +99,7 @@ fun LiveMapScreen(city: City) {
     val overlay = remember {
         VehiclesOverlay(density.density) { selected = it }
     }
-    overlay.vehicles = vehicles
-    overlay.stops = stops
-    overlay.accent = accent.toArgb()
+    val accentArgb = accent.toArgb()
 
     Box(Modifier.fillMaxSize()) {
         AndroidView(
@@ -116,7 +114,19 @@ fun LiveMapScreen(city: City) {
                     mapRef = this
                 }
             },
-            update = { it.invalidate() },
+            // The overlay is a plain View-side object, so the map only repaints
+            // when told to. Feeding it inside `update` makes this lambda read
+            // the vehicle state, so Compose re-runs it — and the invalidate —
+            // on every poll. Assigning during composition (the old code) never
+            // invalidated: with a warm tile cache nothing else repainted the
+            // map either, and the fleet stayed invisible until a touch
+            // (issue #2 — the "R8 bug" that reproduced on any warm reopen).
+            update = { map ->
+                overlay.vehicles = vehicles
+                overlay.stops = stops
+                overlay.accent = accentArgb
+                map.invalidate()
+            },
             onRelease = { it.onDetach() },
             modifier = Modifier.fillMaxSize(),
         )
