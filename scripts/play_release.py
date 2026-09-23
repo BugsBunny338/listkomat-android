@@ -16,6 +16,10 @@ Usage:
   play_release.py promote <from> <to> [--notes-file F]
         # moves the newest release across tracks; notes are the DESTINATION
         # track's (play/release-notes/<to>.txt), never carried over from <from>
+  play_release.py listing <lang> [--dry-run]
+        # uploads play/listing/<lang>/{title,short_description,full_description}.txt
+        # as the store listing for <lang> (e.g. cs-CZ, en-US); diffs against the
+        # live listing first and does nothing when they already match
 
 Run ./gradlew bundleRelease first; this script deliberately does not build.
 """
@@ -30,6 +34,11 @@ UPLOAD_BASE = f"https://androidpublisher.googleapis.com/upload/androidpublisher/
 AAB = os.path.join(os.path.dirname(__file__), os.pardir,
                    "app/build/outputs/bundle/release/app-release.aab")
 TRACKS = ("internal", "alpha", "beta", "production")
+LISTING_DIR = os.path.join(os.path.dirname(__file__), os.pardir, "play", "listing")
+# file name -> (API field, Play's character limit)
+LISTING_FIELDS = {"title": ("title", 30),
+                  "short_description": ("shortDescription", 80),
+                  "full_description": ("fullDescription", 4000)}
 
 
 def token() -> str:
@@ -47,7 +56,8 @@ def token() -> str:
         urllib.request.Request(sa["token_uri"], data=body)))["access_token"]
 
 
-def call(tok, method, url, data=None, content_type="application/json"):
+def call(tok, method, url, data=None, content_type="application/json",
+         allow_404=False):
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {tok}", "Content-Type": content_type})
     try:
@@ -55,6 +65,8 @@ def call(tok, method, url, data=None, content_type="application/json"):
             raw = r.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
+        if allow_404 and e.code == 404:
+            return None
         sys.exit(f"ERROR {method} {url}\n{e.code}: {e.read().decode()[:500]}")
 
 
@@ -133,6 +145,37 @@ def cmd_promote(src, dst, notes_file=None):
     print(f"DONE: {release.get('name')} promoted {src} -> {dst}")
 
 
+def cmd_listing(lang, dry_run=False):
+    local = {}
+    for name, (field, limit) in LISTING_FIELDS.items():
+        text = open(os.path.join(LISTING_DIR, lang, f"{name}.txt")).read().strip()
+        print(f"{name:<18} {len(text):>4} / {limit}")
+        if len(text) > limit:
+            sys.exit(f"ERROR: {lang}/{name}.txt is over Play's {limit}-char limit")
+        local[field] = text
+    tok = token()
+    eid = call(tok, "POST", f"{BASE}/edits", b"{}")["id"]
+    try:
+        live = call(tok, "GET", f"{BASE}/edits/{eid}/listings/{lang}", allow_404=True) or {}
+        changed = [f for f in local if live.get(f, "") != local[f]]
+        for f in changed:
+            print(f"--- live {f}:\n{live.get(f, '(none)')}\n+++ local {f}:\n{local[f]}\n")
+        if not changed:
+            print(f"UNCHANGED: the live {lang} listing already matches play/listing/{lang}/")
+            return
+        if dry_run:
+            print(f"DRY RUN: {len(changed)} field(s) would change; nothing uploaded")
+            return
+        call(tok, "PUT", f"{BASE}/edits/{eid}/listings/{lang}",
+             json.dumps({"language": lang, **local}).encode())
+        call(tok, "POST", f"{BASE}/edits/{eid}:commit")
+        eid = None
+        print(f"DONE: {lang} listing updated ({', '.join(changed)})")
+    finally:
+        if eid:
+            call(tok, "DELETE", f"{BASE}/edits/{eid}")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args or args[0] == "status":
@@ -145,5 +188,7 @@ if __name__ == "__main__":
     elif args[0] == "promote":
         nf = args[args.index("--notes-file") + 1] if "--notes-file" in args else None
         cmd_promote(args[1], args[2], nf)
+    elif args[0] == "listing":
+        cmd_listing(args[1], "--dry-run" in args)
     else:
         sys.exit(__doc__)
