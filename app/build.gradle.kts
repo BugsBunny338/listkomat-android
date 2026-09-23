@@ -9,13 +9,13 @@ import java.util.Properties
 
 android {
     namespace = "cz.flipcom.listkomat"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cz.flipcom.listkomat"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
+        targetSdk = 36
+        versionCode = 2
         versionName = "0.1"
     }
 
