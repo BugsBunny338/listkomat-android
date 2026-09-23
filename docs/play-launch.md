@@ -29,6 +29,16 @@ agent can automate once the account exists.
    Carto's clean tiles turned out to watermark without a key, tried
    2026-08-31). The swap is contained to `ui/LiveMapScreen.kt`.
 
+## Release automation (LIVE since 2026-09-23)
+
+`scripts/play_release.py` talks to the Google Play Developer API with the
+service account key at `~/.config/listkomat-play/service-account.json`
+(local-only secret; per-app permissions: testing + production releases,
+tester lists, store presence). Commands: `status`, `release <track>`,
+`promote <from> <to>`. Release notes come from `play/release-notes/<track>.txt`
+— edit the files, never the console UI (house rule, same as iOS fastlane
+metadata).
+
 ## What the agent can do once the account exists
 
 - Generate the upload keystore + signing config (kept out of git).
