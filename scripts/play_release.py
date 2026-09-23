@@ -8,12 +8,14 @@ Auth: service account JSON at ~/.config/listkomat-play/service-account.json
 release + store-presence permissions on Lístkomat only.
 
 Usage:
-  play_release.py status                      # tracks + releases overview
+  play_release.py status                      # tracks + releases + notes overview
   play_release.py release <track> [--notes-file F] [--name N]
         # uploads app/build/outputs/bundle/release/app-release.aab to <track>
         # (internal|alpha|beta|production), notes default to
         # play/release-notes/<track>.txt if present
-  play_release.py promote <from> <to>         # move the newest release across tracks
+  play_release.py promote <from> <to> [--notes-file F]
+        # moves the newest release across tracks; notes are the DESTINATION
+        # track's (play/release-notes/<to>.txt), never carried over from <from>
 
 Run ./gradlew bundleRelease first; this script deliberately does not build.
 """
@@ -77,6 +79,9 @@ def cmd_status():
             f"{r.get('name')} [{r.get('status')}] vc={','.join(map(str, r.get('versionCodes', [])))}"
             for r in rels) or "empty"
         print(f"{t['track']:<12} {info}")
+        for r in rels:
+            for n in r.get("releaseNotes", []):
+                print(f"{'':<12}   notes [{n['language']}]: {n['text']}")
     call(tok, "DELETE", f"{BASE}/edits/{edit['id']}")
 
 
@@ -105,7 +110,7 @@ def cmd_release(track, notes_file=None, name=None):
     print(f"DONE: versionCode {vc} rolled out to '{track}'")
 
 
-def cmd_promote(src, dst):
+def cmd_promote(src, dst, notes_file=None):
     assert src in TRACKS and dst in TRACKS
     tok = token()
     edit = call(tok, "POST", f"{BASE}/edits", b"{}")
@@ -114,7 +119,14 @@ def cmd_promote(src, dst):
               call(tok, "GET", f"{BASE}/edits/{eid}/tracks").get("tracks", [])}
     rels = tracks.get(src, {}).get("releases", [])
     assert rels, f"no release on '{src}'"
-    release = rels[0]
+    # Copy, then swap in the destination's notes — the source release carries
+    # its own track's notes ("Interní build.") that must not reach testers.
+    release = dict(rels[0])
+    notes = notes_for(dst, notes_file)
+    if notes:
+        release["releaseNotes"] = notes
+    else:
+        release.pop("releaseNotes", None)
     call(tok, "PUT", f"{BASE}/edits/{eid}/tracks/{dst}",
          json.dumps({"track": dst, "releases": [release]}).encode())
     call(tok, "POST", f"{BASE}/edits/{eid}:commit")
@@ -131,6 +143,7 @@ if __name__ == "__main__":
         nm = args[args.index("--name") + 1] if "--name" in args else None
         cmd_release(track, nf, nm)
     elif args[0] == "promote":
-        cmd_promote(args[1], args[2])
+        nf = args[args.index("--notes-file") + 1] if "--notes-file" in args else None
+        cmd_promote(args[1], args[2], nf)
     else:
         sys.exit(__doc__)
