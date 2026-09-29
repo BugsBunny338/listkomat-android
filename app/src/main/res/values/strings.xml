@@ -72,6 +72,11 @@
     <string name="map_no_vehicles">Žádná vozidla v okolí</string>
     <string name="map_load_failed">Živá data dočasně nedostupná</string>
     <string name="map_towards">Směr %1$s</string>
+    <string name="map_title">Živá mapa – %1$s</string>
+    <string name="map_back">Zpět</string>
+    <string name="map_close_card">Zavřít</string>
+    <string name="map_recenter">Vycentrovat mapu</string>
+    <string name="map_connecting_brno_hint">Brno vysílá polohy vozidel přibližně jednou za 30 sekund.</string>
     <string name="kind_tram">Tramvaj</string>
     <string name="kind_metro">Metro</string>
     <string name="kind_trolleybus">Trolejbus</string>

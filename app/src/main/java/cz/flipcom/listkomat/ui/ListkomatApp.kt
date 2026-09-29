@@ -5,6 +5,11 @@ import android.content.ActivityNotFoundException
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,11 +34,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -78,7 +85,11 @@ fun ListkomatApp(viewModel: AppViewModel) {
     var showingPicker by remember { mutableStateOf(false) }
     var showingPrimer by remember { mutableStateOf(false) }
     var showingTheme by remember { mutableStateOf(false) }
-    var showingMap by remember { mutableStateOf(false) }
+    // Saveable: a rotation recreates the activity and must not close the map.
+    var showingMap by rememberSaveable { mutableStateOf(false) }
+    // Restored after process death before the catalog/GPS yield a city: the
+    // map isn't up yet, so neither Back nor TalkBack may act as if it were.
+    val mapUp = showingMap && currentCity != null
     var showingNoSms by remember { mutableStateOf(false) }
     var rainNonce by remember { mutableStateOf(0) }
 
@@ -146,15 +157,20 @@ fun ListkomatApp(viewModel: AppViewModel) {
     }
     val view = androidx.compose.ui.platform.LocalView.current
     val wantLightIcons = if (theme.band != null) theme.isDark else surfaceDark
-    androidx.compose.runtime.LaunchedEffect(wantLightIcons) {
+    // The gesture pill sits on the surface at home and on the surface-tinted
+    // scrim over the live map, so it follows the surface darkness in both.
+    androidx.compose.runtime.LaunchedEffect(wantLightIcons, surfaceDark) {
         (view.context as? android.app.Activity)?.window?.let { window ->
-            androidx.core.view.WindowCompat.getInsetsController(window, view)
-                .isAppearanceLightStatusBars = !wantLightIcons
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !wantLightIcons
+            controller.isAppearanceLightNavigationBars = !surfaceDark
         }
     }
 
     ListkomatTheme(theme = theme, appearanceMode = appearance) {
         Scaffold(
+            // Hidden under the opaque map, so keep it out of TalkBack's reach too.
+            modifier = if (mapUp) Modifier.clearAndSetSemantics {} else Modifier,
             topBar = {
                 val band = theme.band
                 TopAppBar(
@@ -235,16 +251,17 @@ fun ListkomatApp(viewModel: AppViewModel) {
                 }
             }
         }
-        if (showingMap && currentCity != null) {
-            androidx.activity.compose.BackHandler { showingMap = false }
-            androidx.compose.ui.window.Dialog(
-                onDismissRequest = { showingMap = false },
-                properties = androidx.compose.ui.window.DialogProperties(
-                    usePlatformDefaultWidth = false),
-            ) {
-                Box(Modifier.fillMaxSize()) {
-                    LiveMapScreen(city = currentCity)
-                }
+        // The map is a full-screen layer in the activity window (not a Dialog,
+        // which has its own window): edge-to-edge and the system-bar tints
+        // above apply to it. No navigation library — one destination.
+        androidx.activity.compose.BackHandler(enabled = mapUp) { showingMap = false }
+        AnimatedVisibility(
+            visible = mapUp,
+            enter = fadeIn() + slideInHorizontally { it / 5 },
+            exit = fadeOut() + slideOutHorizontally { it / 5 },
+        ) {
+            currentCity?.let { city ->
+                LiveMapScreen(city = city, theme = theme, onBack = { showingMap = false })
             }
         }
         if (showingNoSms) {

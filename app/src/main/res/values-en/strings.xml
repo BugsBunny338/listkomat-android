@@ -68,6 +68,11 @@
     <string name="map_no_vehicles">No vehicles nearby</string>
     <string name="map_load_failed">Live data temporarily unavailable</string>
     <string name="map_towards">Towards %1$s</string>
+    <string name="map_title">Live map – %1$s</string>
+    <string name="map_back">Back</string>
+    <string name="map_close_card">Close</string>
+    <string name="map_recenter">Recenter map</string>
+    <string name="map_connecting_brno_hint">Brno broadcasts vehicle positions about once every 30 seconds.</string>
     <string name="kind_tram">Tram</string>
     <string name="kind_metro">Metro</string>
     <string name="kind_trolleybus">Trolleybus</string>
