@@ -27,6 +27,10 @@ object BrnoStream {
     /** Silence on an established socket that means the feed died under us. */
     const val STALL_TIMEOUT_MS = 70_000L
 
+    /** Consecutive undecodable messages that force a reconnect, whose strict
+     *  first decode then surfaces schema drift as a failed fetch (iOS). */
+    const val DECODE_FAILURE_CUTOFF = 25
+
     /** Keep only vehicles that reported within this window (seconds). */
     const val FRESHNESS_LIMIT_SEC = 120L
 
