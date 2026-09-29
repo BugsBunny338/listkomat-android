@@ -35,7 +35,7 @@ agent can automate once the account exists.
 service account key at `~/.config/listkomat-play/service-account.json`
 (local-only secret; per-app permissions: testing + production releases,
 tester lists, store presence). Commands: `status`, `release <track>`,
-`promote <from> <to>`. Release notes come from `play/release-notes/<track>.txt`
+`promote <from> <to>`, `listing <lang> [--dry-run]`. Release notes come from `play/release-notes/<track>.txt`
 — edit the files, never the console UI (house rule, same as iOS fastlane
 metadata).
 
