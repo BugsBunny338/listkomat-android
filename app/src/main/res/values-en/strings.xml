@@ -3,10 +3,6 @@
     <string name="app_name">Lístkomat</string>
     <string name="cities_title">Where are you?</string>
     <string name="price_format">%1$d CZK</string>
-    <string name="buy_confirm_title">Buy a ticket?</string>
-    <string name="buy_confirm_message">A premium SMS “%1$s” will be sent to %2$s for %3$d CZK. The price is charged to your mobile account.</string>
-    <string name="buy_confirm_send">Continue</string>
-    <string name="cancel">Cancel</string>
     <string name="sms_sent_title">Did you send the SMS?</string>
     <string name="sms_sent_message">If you sent the ticket SMS, we\'ll start the validity countdown.</string>
     <string name="sms_sent_yes">Yes, sent</string>

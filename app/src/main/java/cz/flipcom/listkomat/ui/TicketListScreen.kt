@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +46,6 @@ fun TicketListScreen(
 ) {
     val language = Locale.getDefault().language
     val context = LocalContext.current
-    var confirming by remember { mutableStateOf<Ticket?>(null) }
     var showingSheet by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -116,7 +114,7 @@ fun TicketListScreen(
         }
         items(city.tickets, key = { it.code }) { ticket ->
             Card(
-                Modifier.fillMaxWidth().clickable { confirming = ticket },
+                Modifier.fillMaxWidth().clickable { onBuy(ticket) },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -172,28 +170,6 @@ fun TicketListScreen(
 
     if (showingSheet) {
         SimRequirementSheet(onDismiss = { showingSheet = false })
-    }
-
-    confirming?.let { ticket ->
-        AlertDialog(
-            onDismissRequest = { confirming = null },
-            title = { Text(stringResource(R.string.buy_confirm_title)) },
-            text = {
-                Text(stringResource(
-                    R.string.buy_confirm_message, ticket.code, city.smsNumber, ticket.priceKc))
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirming = null
-                    onBuy(ticket)
-                }) { Text(stringResource(R.string.buy_confirm_send)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirming = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
     }
 }
 
