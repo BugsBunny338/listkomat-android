@@ -14,6 +14,9 @@ import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.ForeignSimNotice
 import cz.flipcom.listkomat.model.NearestCity
+import cz.flipcom.listkomat.model.PendingTicket
+import cz.flipcom.listkomat.model.Purchase
+import cz.flipcom.listkomat.model.PurchaseHandoff
 import cz.flipcom.listkomat.model.Ticket
 import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
@@ -37,14 +40,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val activeTicket: StateFlow<ActiveTicket?> = _activeTicket
 
     /**
-     * Set when we hand off to the SMS app; on the next resume the UI asks
-     * "did you send it?" and starts the countdown. ACTION_SENDTO reports
-     * nothing back, so asking the user is the only honest signal.
+     * The SMS hand-off in flight. ACTION_SENDTO reports nothing back, so asking
+     * the user is the only honest signal — but only once the SMS app has
+     * covered us and we are resumed again ([Purchase.AwaitingAnswer]); the UI
+     * feeds pause/resume in via [handOffLeft]/[handOffReturned]. Persisted
+     * from the moment it is armed, so process death while the user is in the
+     * SMS app still asks on return (within 10 minutes).
      */
-    private val _pendingPurchase = MutableStateFlow<PendingPurchase?>(null)
-    val pendingPurchase: StateFlow<PendingPurchase?> = _pendingPurchase
-
-    data class PendingPurchase(val city: City, val ticket: Ticket)
+    private val handoff = PurchaseHandoff(activeStore, System::currentTimeMillis)
+    val purchase: StateFlow<Purchase?> = handoff.state
 
     private val noticePrefs =
         app.getSharedPreferences("foreign_sim_notice", Context.MODE_PRIVATE)
@@ -138,22 +142,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Call right before starting the SMS activity. */
     fun smsHandedOff(city: City, ticket: Ticket) {
-        _pendingPurchase.value = PendingPurchase(city, ticket)
+        handoff.armed(PendingTicket(
+            cityKey = city.key,
+            cityName = city.name,
+            ticketCode = ticket.code,
+            durationMinutes = ticket.durationMinutes,
+            priceKc = ticket.priceKc,
+            armedAt = System.currentTimeMillis(),
+        ))
     }
+
+    fun handOffLeft() = handoff.left()
+    fun handOffReturned() = handoff.returned()
+    fun handOffDeadlineIn(): Long? = handoff.handOffDeadlineIn()
+    fun handOffTimedOut() = handoff.timedOut()
+    fun handOffFailed() = handoff.failed()
+    fun handOffFailureAcknowledged() { handoff.resolved() }
 
     /** User confirmed they sent the SMS — start the validity countdown. */
     fun purchaseConfirmed() {
-        val pending = _pendingPurchase.value ?: return
-        _pendingPurchase.value = null
+        val pending = handoff.resolved() ?: return
         val ticket = ActiveTicket(
-            cityKey = pending.city.key,
-            cityName = pending.city.name,
-            ticketLabel = DurationFormat.format(getApplication(), pending.ticket.durationMinutes),
-            priceKc = pending.ticket.priceKc,
+            cityKey = pending.cityKey,
+            cityName = pending.cityName,
+            ticketLabel = DurationFormat.format(getApplication(), pending.durationMinutes),
+            priceKc = pending.priceKc,
             timeline = TicketTimeline.make(
                 sentAtMs = System.currentTimeMillis(),
-                durationMinutes = pending.ticket.durationMinutes,
+                durationMinutes = pending.durationMinutes,
             ),
         )
         activeStore.save(ticket)
@@ -162,7 +180,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun purchaseDismissed() {
-        _pendingPurchase.value = null
+        handoff.resolved()
     }
 
     /** Confirmation SMS arrived early — re-anchor validity to now. */

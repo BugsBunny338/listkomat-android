@@ -13,7 +13,7 @@
     <string name="end_ticket">Ukončit</string>
     <string name="ticket_expired">Jízdenka vypršela</string>
     <string name="stale_prices_hint">Nepodařilo se ověřit aktuální ceny — zobrazené ceny mohou být zastaralé.</string>
-    <string name="no_sms_app">Nenašla se žádná aplikace pro SMS.</string>
+    <string name="sms_no_app">Nepodařilo se otevřít aplikaci pro SMS.</string>
     <string name="notification_channel_ticket">Jízdenka</string>
     <string name="notification_expired_title">Jízdenka vypršela</string>
     <string name="notification_expired_body">Platnost jízdenky skončila.</string>
