@@ -232,6 +232,31 @@ class LiveSourcesTest {
         again.await()
     }
 
+    @Test
+    fun `brno connect cancelled by shutdown fails the waiting fetch with IOException`() = runTest {
+        val h = Harness(this)
+        val fetch = async { runCatching { h.source.fetch() } }
+        runCurrent()
+        h.source.shutdown()                     // ON_STOP / idle shutdown mid-connect
+        advanceUntilIdle()
+        assertTrue(fetch.await().exceptionOrNull() is IOException)
+        assertTrue(h.sockets[0].first.closed)
+    }
+
+    @Test
+    fun `brno cancelled caller propagates cancellation while the shared connect keeps going`() = runTest {
+        val h = Harness(this)
+        val caller = async { h.source.fetch() }
+        runCurrent()
+        caller.cancel()
+        runCurrent()
+        assertTrue(caller.isCancelled)
+        assertFalse(h.sockets[0].first.closed)  // the connect itself was not torn down
+        h.send(0, vehicle(3))
+        advanceUntilIdle()
+        assertEquals(listOf("3"), h.source.retained()?.map { it.id })
+    }
+
     private suspend fun assertFetchFails(block: suspend () -> Unit) {
         try {
             block()

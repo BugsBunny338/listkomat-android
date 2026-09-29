@@ -32,7 +32,6 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
 
 /** logcat tag for the live-map connection lifecycle (`adb logcat -s Listkomat`). */
 const val LOG_TAG = "Listkomat"
@@ -242,14 +241,19 @@ class PragueLiveSource(
                         if (cont.isActive) cont.resumeWith(Result.failure(e))
                     }
                     override fun onResponse(call: okhttp3.Call, response: Response) {
-                        response.use {
-                            if (!it.isSuccessful) {
-                                if (cont.isActive) cont.resumeWith(Result.failure(IOException("HTTP ${it.code}")))
-                            } else {
-                                val text = it.body?.string().orEmpty()
-                                if (cont.isActive) cont.resume(text)
+                        // The body is read here, and OkHttp only logs an
+                        // IOException thrown from onResponse — never calls
+                        // onFailure — so a body read that times out must fail
+                        // the fetch itself, or the poll hangs with no banner.
+                        val result = try {
+                            response.use {
+                                if (!it.isSuccessful) Result.failure(IOException("HTTP ${it.code}"))
+                                else Result.success(it.body?.string().orEmpty())
                             }
+                        } catch (e: IOException) {
+                            Result.failure(e)
                         }
+                        if (cont.isActive) cont.resumeWith(result)
                     }
                 })
             }
@@ -334,8 +338,15 @@ class BrnoLiveStreamSource(
             socket = null
         }
         val first = CompletableDeferred<String>()
+        val context = currentCoroutineContext()
         val ws = openSocket(listener(first))
         synchronized(this) {
+            // A shutdown() between openSocket and here already cancelled us;
+            // publishing ws would let the next fetch skip reconnecting.
+            if (!context.isActive) {
+                ws.cancel()
+                throw CancellationException("Brno connect cancelled")
+            }
             socket = ws
             // Fresh socket, fresh streak — otherwise the first bad frame after
             // a cutoff reconnect would tear the new socket down again.

@@ -144,7 +144,7 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
     // at once; with none yet it is "connecting", never "no vehicles".
     val seeded = remember(city.key) { source.retained() }
     var vehicles by remember(city.key) { mutableStateOf(seeded ?: emptyList()) }
-    var loadFailed by remember { mutableStateOf(false) }
+    var loadFailed by rememberSaveable { mutableStateOf(false) }
     var didLoadOnce by remember(city.key) { mutableStateOf(seeded != null) }
     val camera = rememberSaveable(city.key, saver = MapCamera.Saver) {
         MapCamera(city.lat, city.lng, DEFAULT_ZOOM)
