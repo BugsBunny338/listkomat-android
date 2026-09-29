@@ -21,17 +21,22 @@ data class PendingTicket(
 
 sealed interface Purchase {
     /** Handed off; waiting for the SMS app to cover us ([sawPause]) and for
-     *  the user to come back. [pausedAt] feeds the rotation guard. */
+     *  the user to come back. [pausedAt] feeds the rotation guard.
+     *  [timedOut]: no pause within the timeout, so we say the SMS app didn't
+     *  open — but keep the purchase, because a pause may still come (e.g.
+     *  Messages already open in the other split-screen pane never pauses us). */
     data class Armed(
         val pending: PendingTicket,
         val sawPause: Boolean = false,
         val pausedAt: Long? = null,
+        val timedOut: Boolean = false,
     ) : Purchase
 
-    /** Back from the SMS app — ask "did you send it?". */
-    data class AwaitingAnswer(val pending: PendingTicket) : Purchase
+    /** Back from the SMS app — ask "did you send it?". [sentAtMs] anchors the
+     *  countdown if the answer is yes. */
+    data class AwaitingAnswer(val pending: PendingTicket, val sentAtMs: Long) : Purchase
 
-    /** The SMS app never opened (none installed, or it didn't take over). */
+    /** No SMS app could be started at all. */
     data object Failed : Purchase
 }
 
@@ -62,19 +67,26 @@ class PurchaseHandoff(
         // A persisted purchase means the process died between hand-off and
         // answer. Recent enough → the user is most likely just back from the
         // SMS app, so ask now; stale → they have long moved on, drop it.
+        // We can't know when they came back, so a yes anchors the countdown
+        // at the hand-off: never show more validity than the operator grants.
         store.loadPending()?.let { pending ->
             if (now() - pending.armedAt < RESTORE_WINDOW_MS) {
-                _state.value = Purchase.AwaitingAnswer(pending)
+                _state.value = Purchase.AwaitingAnswer(pending, sentAtMs = pending.armedAt)
             } else {
                 store.clearPending()
             }
         }
     }
 
-    /** Called just before starting the SMS activity. */
-    fun armed(pending: PendingTicket) {
+    /** Called just before starting the SMS activity. Returns false — and the
+     *  caller must not hand off — while a hand-off is already in flight: a
+     *  second tap landing before the SMS app covers us must neither start a
+     *  second SMS nor reset the first purchase's pause tracking. */
+    fun armed(pending: PendingTicket): Boolean {
+        if (_state.value != null) return false
         store.savePending(pending)
         _state.value = Purchase.Armed(pending)
+        return true
     }
 
     /** ON_PAUSE — the SMS app is taking over. */
@@ -92,22 +104,24 @@ class PurchaseHandoff(
         _state.value = if (now() - pausedAt < ROTATION_GUARD_MS) {
             armed.copy(sawPause = false, pausedAt = null)
         } else {
-            Purchase.AwaitingAnswer(armed.pending)
+            Purchase.AwaitingAnswer(armed.pending, sentAtMs = now())
         }
     }
 
     /** Milliseconds until [timedOut] should be checked, or null when not armed. */
     fun handOffDeadlineIn(): Long? {
         val armed = _state.value as? Purchase.Armed ?: return null
+        if (armed.timedOut) return null
         return (armed.pending.armedAt + HANDOFF_TIMEOUT_MS - now()).coerceAtLeast(0)
     }
 
     /** The fallback: armed but never paused within [HANDOFF_TIMEOUT_MS] means
-     *  the SMS app didn't take over. */
+     *  the SMS app most likely didn't take over. Non-destructive — see
+     *  [Purchase.Armed.timedOut]; the user's OK on the alert clears it. */
     fun timedOut() {
         val armed = _state.value as? Purchase.Armed ?: return
         if (armed.sawPause || now() - armed.pending.armedAt < HANDOFF_TIMEOUT_MS) return
-        failed()
+        _state.value = armed.copy(timedOut = true)
     }
 
     /** No SMS app could be started at all. */
@@ -117,12 +131,12 @@ class PurchaseHandoff(
     }
 
     /** The user answered (yes or no) or acknowledged a failure. Returns the
-     *  pending ticket that was being asked about, if any. */
-    fun resolved(): PendingTicket? {
-        val pending = (_state.value as? Purchase.AwaitingAnswer)?.pending
+     *  question that was being asked, if any. */
+    fun resolved(): Purchase.AwaitingAnswer? {
+        val asked = _state.value as? Purchase.AwaitingAnswer
         store.clearPending()
         _state.value = null
-        return pending
+        return asked
     }
 
     companion object {

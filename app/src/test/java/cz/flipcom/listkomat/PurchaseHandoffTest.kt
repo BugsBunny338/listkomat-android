@@ -7,6 +7,7 @@ import cz.flipcom.listkomat.model.PurchaseHandoff.Companion.HANDOFF_TIMEOUT_MS
 import cz.flipcom.listkomat.model.PurchaseHandoff.Companion.RESTORE_WINDOW_MS
 import cz.flipcom.listkomat.model.PurchaseHandoff.Companion.ROTATION_GUARD_MS
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,7 +44,7 @@ class PurchaseHandoffTest {
         h.left()
         clock += 5_000
         h.returned()
-        assertEquals(Purchase.AwaitingAnswer(ticket(armedAt = clock - 5_000)), h.state.value)
+        assertEquals(Purchase.AwaitingAnswer(ticket(armedAt = clock - 5_000), sentAtMs = clock), h.state.value)
     }
 
     @Test
@@ -66,13 +67,58 @@ class PurchaseHandoffTest {
     }
 
     @Test
-    fun `armed and never paused within the timeout fails and clears persistence`() {
+    fun `a real trip after a rotation-guard reset still asks`() {
+        val h = handoff()
+        h.armed(ticket())
+        h.left(); clock += 100; h.returned()   // rotation
+        h.left(); clock += 5_000; h.returned() // Messages
+        assertTrue(h.state.value is Purchase.AwaitingAnswer)
+    }
+
+    @Test
+    fun `a second tap while armed is refused and keeps the first purchase`() {
+        val h = handoff()
+        val first = ticket()
+        assertTrue(h.armed(first))
+        h.left()
+        clock += 50
+        assertFalse(h.armed(ticket().copy(ticketCode = "DPT55")))
+        val armed = h.state.value as Purchase.Armed
+        assertEquals(first, armed.pending)
+        assertTrue(armed.sawPause)
+        assertEquals(first, store.pending)
+    }
+
+    @Test
+    fun `armed and never paused within the timeout reports failure but keeps the purchase`() {
         val h = handoff()
         h.armed(ticket())
         assertEquals(HANDOFF_TIMEOUT_MS, h.handOffDeadlineIn())
         clock += HANDOFF_TIMEOUT_MS
         h.timedOut()
-        assertEquals(Purchase.Failed, h.state.value)
+        assertTrue((h.state.value as Purchase.Armed).timedOut)
+        assertNull(h.handOffDeadlineIn())
+        assertEquals(ticket(armedAt = clock - HANDOFF_TIMEOUT_MS), store.pending)
+    }
+
+    @Test
+    fun `a pause after the timeout still asks on return`() {
+        val h = handoff()
+        h.armed(ticket())
+        clock += HANDOFF_TIMEOUT_MS
+        h.timedOut()
+        h.left(); clock += 5_000; h.returned()
+        assertTrue(h.state.value is Purchase.AwaitingAnswer)
+    }
+
+    @Test
+    fun `acknowledging a timeout clears persistence`() {
+        val h = handoff()
+        h.armed(ticket())
+        clock += HANDOFF_TIMEOUT_MS
+        h.timedOut()
+        assertNull(h.resolved())
+        assertNull(h.state.value)
         assertNull(store.pending)
     }
 
@@ -108,7 +154,9 @@ class PurchaseHandoffTest {
     fun `persisted purchase younger than the window restores straight to asking`() {
         store.pending = ticket(armedAt = clock - RESTORE_WINDOW_MS + 1)
         val h = handoff()
-        assertEquals(Purchase.AwaitingAnswer(store.pending!!), h.state.value)
+        // Anchored at the hand-off, not at "now": never overstate validity.
+        assertEquals(Purchase.AwaitingAnswer(store.pending!!, sentAtMs = clock - RESTORE_WINDOW_MS + 1),
+            h.state.value)
     }
 
     @Test
@@ -124,7 +172,9 @@ class PurchaseHandoffTest {
         val h = handoff()
         h.armed(ticket())
         h.left(); clock += 1_000; h.returned()
-        assertEquals("DPT42", h.resolved()?.ticketCode)
+        val asked = h.resolved()
+        assertEquals("DPT42", asked?.pending?.ticketCode)
+        assertEquals(clock, asked?.sentAtMs)
         assertNull(h.state.value)
         assertNull(store.pending)
     }

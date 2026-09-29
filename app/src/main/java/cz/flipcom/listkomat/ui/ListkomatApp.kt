@@ -218,14 +218,17 @@ fun ListkomatApp(viewModel: AppViewModel) {
                             if (!context.packageManager.hasSystemFeature(
                                     android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
                                 showingNoSms = true
-                            } else try {
+                            } else if (viewModel.smsHandedOff(currentCity, ticket)) {
                                 // Armed (and persisted) before we leave, so even
                                 // an immediate process death is remembered.
-                                viewModel.smsHandedOff(currentCity, ticket)
-                                context.startActivity(
-                                    SmsPurchase.intent(currentCity.smsNumber, ticket.code))
-                            } catch (e: ActivityNotFoundException) {
-                                viewModel.handOffFailed()
+                                try {
+                                    context.startActivity(
+                                        SmsPurchase.intent(currentCity.smsNumber, ticket.code))
+                                } catch (e: ActivityNotFoundException) {
+                                    viewModel.handOffFailed()
+                                } catch (e: SecurityException) {
+                                    viewModel.handOffFailed()
+                                }
                             }
                         },
                     )
@@ -281,21 +284,16 @@ fun ListkomatApp(viewModel: AppViewModel) {
                 onDismiss = { showingPicker = false },
             )
         }
-        when (purchase) {
+        when (val p = purchase) {
             is Purchase.AwaitingAnswer -> SmsSentDialog(
                 onSent = confirmPurchase,
                 onNotSent = viewModel::purchaseDismissed,
             )
-            Purchase.Failed -> AlertDialog(
-                // iOS parity: .deviceCannotSendSMS is an alert, not a toast.
-                onDismissRequest = viewModel::handOffFailureAcknowledged,
-                title = { Text(stringResource(R.string.sms_impossible_title)) },
-                text = { Text(stringResource(R.string.sms_no_app)) },
-                confirmButton = {
-                    TextButton(onClick = viewModel::handOffFailureAcknowledged) { Text("OK") }
-                },
-            )
-            is Purchase.Armed, null -> {}
+            is Purchase.Armed -> if (p.timedOut) {
+                SmsFailedAlert(onDismiss = viewModel::handOffFailureAcknowledged)
+            }
+            Purchase.Failed -> SmsFailedAlert(onDismiss = viewModel::handOffFailureAcknowledged)
+            null -> {}
         }
     }
 }
@@ -345,6 +343,17 @@ private fun LocationPrimer(onContinue: () -> Unit) {
         confirmButton = {
             Button(onClick = onContinue) { Text(stringResource(R.string.primer_continue)) }
         },
+    )
+}
+
+/** iOS parity: .deviceCannotSendSMS is an alert, not a toast. */
+@Composable
+private fun SmsFailedAlert(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sms_impossible_title)) },
+        text = { Text(stringResource(R.string.sms_no_app)) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
     )
 }
 

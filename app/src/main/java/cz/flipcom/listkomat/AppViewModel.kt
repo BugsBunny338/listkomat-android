@@ -44,8 +44,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * the user is the only honest signal — but only once the SMS app has
      * covered us and we are resumed again ([Purchase.AwaitingAnswer]); the UI
      * feeds pause/resume in via [handOffLeft]/[handOffReturned]. Persisted
-     * from the moment it is armed, so process death while the user is in the
-     * SMS app still asks on return (within 10 minutes).
+     * from the moment it is armed, so even if the process dies while the user
+     * is in the SMS app we still ask when the app is next opened, provided
+     * that is within 10 minutes of the hand-off.
      */
     private val handoff = PurchaseHandoff(activeStore, System::currentTimeMillis)
     val purchase: StateFlow<Purchase?> = handoff.state
@@ -142,8 +143,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Call right before starting the SMS activity. */
-    fun smsHandedOff(city: City, ticket: Ticket) {
+    /** Call right before starting the SMS activity; false = a hand-off is
+     *  already in flight, don't start another. */
+    fun smsHandedOff(city: City, ticket: Ticket): Boolean =
         handoff.armed(PendingTicket(
             cityKey = city.key,
             cityName = city.name,
@@ -152,7 +154,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             priceKc = ticket.priceKc,
             armedAt = System.currentTimeMillis(),
         ))
-    }
 
     fun handOffLeft() = handoff.left()
     fun handOffReturned() = handoff.returned()
@@ -163,14 +164,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** User confirmed they sent the SMS — start the validity countdown. */
     fun purchaseConfirmed() {
-        val pending = handoff.resolved() ?: return
+        val asked = handoff.resolved() ?: return
+        val pending = asked.pending
         val ticket = ActiveTicket(
             cityKey = pending.cityKey,
             cityName = pending.cityName,
             ticketLabel = DurationFormat.format(getApplication(), pending.durationMinutes),
             priceKc = pending.priceKc,
             timeline = TicketTimeline.make(
-                sentAtMs = System.currentTimeMillis(),
+                sentAtMs = asked.sentAtMs,
                 durationMinutes = pending.durationMinutes,
             ),
         )
