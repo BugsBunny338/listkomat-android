@@ -22,6 +22,7 @@ import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -103,7 +104,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         _locationState.value = LocationState.Searching
         viewModelScope.launch {
-            val fix = runCatching { LocationService.coarseFix(getApplication()) }.getOrNull()
+            val fix = runCatching { LocationService.coarseFix(getApplication()) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
             val nearest = fix?.let { NearestCity.nearest(it.latitude, it.longitude, _catalog.value.cities) }
             // No fix is NOT "denied" — iOS keeps the searching state (with the
             // manual pick button right there) rather than blaming permissions.

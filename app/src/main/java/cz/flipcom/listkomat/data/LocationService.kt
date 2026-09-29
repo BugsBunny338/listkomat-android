@@ -34,8 +34,9 @@ object LocationService {
             add(LocationManager.GPS_PROVIDER)
             if (Build.VERSION.SDK_INT >= 31) add(LocationManager.FUSED_PROVIDER)
         }
-        // getProviders(true) is enabled AND permitted: before Android 12 a
-        // coarse-only app may not use "gps" at all, and asking it throws.
+        // getProviders(true) is enabled AND permitted. Before Android 12 a
+        // coarse-only app may not use "gps", and asking it throws; this filter
+        // skips it where the OS says so, the catch below guards the rest.
         val usable = lm.getProviders(true)
         val providers = wanted.filter { it in usable }
         val current = withTimeoutOrNull(15_000) {
