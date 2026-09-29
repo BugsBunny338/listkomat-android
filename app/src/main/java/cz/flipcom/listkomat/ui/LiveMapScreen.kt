@@ -52,10 +52,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +74,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.LiveSources
 import cz.flipcom.listkomat.data.Stop
@@ -82,7 +88,11 @@ import cz.flipcom.listkomat.model.TransitPalette
 import cz.flipcom.listkomat.model.Vehicle
 import cz.flipcom.listkomat.model.VehicleKind
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
@@ -93,8 +103,8 @@ import org.osmdroid.views.overlay.Overlay
  * Full-screen live map for a city: vehicles coloured by the shared
  * TransitPalette, a selection card, a recenter button and a failure banner.
  * OpenStreetMap tiles via osmdroid (no API key; attribution shown) — the
- * vehicle data flows exactly like iOS: poll the shared source every 8 s,
- * keep the last positions on failure.
+ * vehicle data flows exactly like iOS: poll the shared source every 8 s
+ * while the screen is started, keep the last positions on failure.
  *
  * Native chrome (brief B1): an opaque themed top bar with back + title +
  * data sources, the map below it running edge to edge under the gesture
@@ -106,6 +116,18 @@ private const val POLL_INTERVAL_MS = 8_000L
  *  never shows the hint, short enough to land well inside Brno's burst wait. */
 private const val SLOW_CONNECT_HINT_MS = 5_000L
 
+private const val DEFAULT_ZOOM = 13.2
+
+/** Where the map is looking; saved so rotation doesn't snap back to the city. */
+private class MapCamera(var lat: Double, var lng: Double, var zoom: Double) {
+    companion object {
+        val Saver = listSaver<MapCamera, Double>(
+            save = { listOf(it.lat, it.lng, it.zoom) },
+            restore = { MapCamera(it[0], it[1], it[2]) },
+        )
+    }
+}
+
 // Tile style: OSM Mapnik is the only clean-licence keyless option — Carto's
 // basemaps watermark without an API key (tried 2026-08-31). The visual
 // upgrade path is the Google Maps SDK once its API key exists (a manual
@@ -116,9 +138,17 @@ private const val SLOW_CONNECT_HINT_MS = 5_000L
 fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    var vehicles by remember { mutableStateOf(listOf<Vehicle>()) }
-    var loadFailed by remember { mutableStateOf(false) }
-    var didLoadOnce by remember { mutableStateOf(false) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val source = remember(city.key) { LiveSources.source(city.key) }
+    // Re-entry (rotation, quick reopen) paints the source's recent positions
+    // at once; with none yet it is "connecting", never "no vehicles".
+    val seeded = remember(city.key) { source.retained() }
+    var vehicles by remember(city.key) { mutableStateOf(seeded ?: emptyList()) }
+    var loadFailed by rememberSaveable { mutableStateOf(false) }
+    var didLoadOnce by remember(city.key) { mutableStateOf(seeded != null) }
+    val camera = rememberSaveable(city.key, saver = MapCamera.Saver) {
+        MapCamera(city.lat, city.lng, DEFAULT_ZOOM)
+    }
     var selected by remember { mutableStateOf<Vehicle?>(null) }
     val stopNames = remember(city.key) {
         if (city.key == "brno") StopNamesStore.brno(context) else emptyMap()
@@ -128,17 +158,27 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
     var mapRef by remember { mutableStateOf<MapView?>(null) }
     var showingSources by remember { mutableStateOf(false) }
 
-    LaunchedEffect(city.key) {
-        val source = LiveSources.source(city.key)
-        while (true) {
-            try {
-                vehicles = source.fetch()
-                loadFailed = false
-            } catch (e: Exception) {
-                loadFailed = true    // keep last vehicles on screen
+    // Interest keeps the source's connection up; leaving (or rotating) starts
+    // LiveSources' 120 s grace, which a re-acquire within it cancels.
+    DisposableEffect(city.key) {
+        LiveSources.acquire(city.key)
+        onDispose { LiveSources.release(city.key) }
+    }
+    // Poll only while visible (iOS pauses on background); a return resumes it.
+    LaunchedEffect(city.key, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                try {
+                    vehicles = source.fetch()
+                    loadFailed = false
+                } catch (e: CancellationException) {
+                    throw e              // paused, not failed
+                } catch (e: Exception) {
+                    loadFailed = true    // keep last vehicles on screen
+                }
+                didLoadOnce = true
+                delay(POLL_INTERVAL_MS)
             }
-            didLoadOnce = true
-            delay(POLL_INTERVAL_MS)
         }
     }
 
@@ -193,8 +233,21 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
                         // osmdroid's legacy ± buttons: pinch is the gesture
                         // everyone knows (feedback round 2); D-pad keys still zoom.
                         zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-                        controller.setZoom(13.2)
-                        controller.setCenter(GeoPoint(city.lat, city.lng))
+                        controller.setZoom(camera.zoom)
+                        controller.setCenter(GeoPoint(camera.lat, camera.lng))
+                        addMapListener(object : MapListener {
+                            override fun onScroll(event: ScrollEvent?) = record()
+                            override fun onZoom(event: ZoomEvent?) = record()
+                            // Before the first layout the centre isn't real yet.
+                            private fun record(): Boolean {
+                                if (isLayoutOccurred) {
+                                    camera.lat = mapCenter.latitude
+                                    camera.lng = mapCenter.longitude
+                                    camera.zoom = zoomLevelDouble
+                                }
+                                return false
+                            }
+                        })
                         overlays.add(overlay)
                         mapRef = this
                     }
@@ -226,7 +279,7 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
                 stopNames = stopNames,
                 onDismissSelection = { selected = null },
                 onRecenter = {
-                    mapRef?.controller?.animateTo(GeoPoint(city.lat, city.lng), 13.2, 400L)
+                    mapRef?.controller?.animateTo(GeoPoint(city.lat, city.lng), DEFAULT_ZOOM, 400L)
                 },
             )
         }
