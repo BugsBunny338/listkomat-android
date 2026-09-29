@@ -87,6 +87,9 @@ fun ListkomatApp(viewModel: AppViewModel) {
     var showingTheme by remember { mutableStateOf(false) }
     // Saveable: a rotation recreates the activity and must not close the map.
     var showingMap by rememberSaveable { mutableStateOf(false) }
+    // Restored after process death before the catalog/GPS yield a city: the
+    // map isn't up yet, so neither Back nor TalkBack may act as if it were.
+    val mapUp = showingMap && currentCity != null
     var showingNoSms by remember { mutableStateOf(false) }
     var rainNonce by remember { mutableStateOf(0) }
 
@@ -167,7 +170,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
     ListkomatTheme(theme = theme, appearanceMode = appearance) {
         Scaffold(
             // Hidden under the opaque map, so keep it out of TalkBack's reach too.
-            modifier = if (showingMap) Modifier.clearAndSetSemantics {} else Modifier,
+            modifier = if (mapUp) Modifier.clearAndSetSemantics {} else Modifier,
             topBar = {
                 val band = theme.band
                 TopAppBar(
@@ -251,9 +254,9 @@ fun ListkomatApp(viewModel: AppViewModel) {
         // The map is a full-screen layer in the activity window (not a Dialog,
         // which has its own window): edge-to-edge and the system-bar tints
         // above apply to it. No navigation library — one destination.
-        androidx.activity.compose.BackHandler(enabled = showingMap) { showingMap = false }
+        androidx.activity.compose.BackHandler(enabled = mapUp) { showingMap = false }
         AnimatedVisibility(
-            visible = showingMap && currentCity != null,
+            visible = mapUp,
             enter = fadeIn() + slideInHorizontally { it / 5 },
             exit = fadeOut() + slideOutHorizontally { it / 5 },
         ) {

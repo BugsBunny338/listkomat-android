@@ -246,9 +246,8 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
 }
 
 /**
- * Keeps the gesture pill legible over light tiles. Twice the inset tall so
- * the fade finishes above the pill; ListkomatApp sets the pill's
- * light/dark appearance to match.
+ * Keeps the gesture pill / nav buttons legible over light tiles;
+ * ListkomatApp sets their light/dark appearance to match.
  */
 @Composable
 private fun NavigationBarScrim(modifier: Modifier) {
@@ -256,8 +255,11 @@ private fun NavigationBarScrim(modifier: Modifier) {
     val surface = MaterialTheme.colorScheme.surface
     val scrim = if (surface.luminance() < 0.5f) Color.Black.copy(alpha = 0.35f)
                 else surface.copy(alpha = 0.6f)
+    // A thin gesture inset gets the fade above the pill; the tall 3-button bar
+    // already has the system's contrast scrim, so it only needs its own height.
+    val height = if (inset < 32.dp) inset * 2 else inset
     Box(
-        modifier.fillMaxWidth().height(inset * 2).background(
+        modifier.fillMaxWidth().height(height).background(
             Brush.verticalGradient(0f to Color.Transparent, 0.5f to scrim, 1f to scrim))
     )
 }
@@ -320,7 +322,8 @@ private fun MapOverlays(
         }
 
         val fabBottom by animateDpAsState(
-            targetValue = if (selected != null) cardHeight + 24.dp else 16.dp,
+            // Wait for the card's first measurement rather than aiming at 24 dp.
+            targetValue = if (selected != null && cardHeight > 0.dp) cardHeight + 24.dp else 16.dp,
             animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = Spring.StiffnessMediumLow),
             label = "fabBottom",
