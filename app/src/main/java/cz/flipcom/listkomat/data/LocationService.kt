@@ -34,14 +34,21 @@ object LocationService {
             add(LocationManager.GPS_PROVIDER)
             if (Build.VERSION.SDK_INT >= 31) add(LocationManager.FUSED_PROVIDER)
         }
-        val providers = wanted.filter { lm.allProviders.contains(it) && lm.isProviderEnabled(it) }
+        // getProviders(true) is enabled AND permitted: before Android 12 a
+        // coarse-only app may not use "gps" at all, and asking it throws.
+        val usable = lm.getProviders(true)
+        val providers = wanted.filter { it in usable }
         val current = withTimeoutOrNull(15_000) {
             if (providers.isEmpty()) return@withTimeoutOrNull null
             coroutineScope {
                 val answers = Channel<Location?>(providers.size)
                 val jobs = providers.map { p ->
                     launch {
-                        answers.send(currentFrom(lm, p, context))
+                        // One provider refusing must not cancel the others.
+                        val fix = try { currentFrom(lm, p, context) }
+                            catch (e: SecurityException) { null }
+                            catch (e: IllegalArgumentException) { null }
+                        answers.send(fix)
                     }
                 }
                 var first: Location? = null
