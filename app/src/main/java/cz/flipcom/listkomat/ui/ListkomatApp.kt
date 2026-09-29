@@ -3,7 +3,6 @@ package cz.flipcom.listkomat.ui
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -37,16 +36,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import cz.flipcom.listkomat.AppViewModel
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.SmsPurchase
 import cz.flipcom.listkomat.AppViewModel.LocationState
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.AppearanceMode
-import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.NearestCity
-import cz.flipcom.listkomat.model.Ticket
+import cz.flipcom.listkomat.model.Purchase
 import java.util.Locale
 
 /**
@@ -63,7 +63,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
     val catalog by viewModel.catalog.collectAsState()
     val refreshFailed by viewModel.refreshFailed.collectAsState()
     val activeTicket by viewModel.activeTicket.collectAsState()
-    val pendingPurchase by viewModel.pendingPurchase.collectAsState()
+    val purchase by viewModel.purchase.collectAsState()
     val selectedCityKey by viewModel.selectedCityKey.collectAsState()
     val simNoticeDismissed by viewModel.simNoticeDismissed.collectAsState()
 
@@ -110,6 +110,30 @@ fun ListkomatApp(viewModel: AppViewModel) {
         if (Build.VERSION.SDK_INT >= 33) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    // The "did you send it?" dialog may only appear once the SMS app has
+    // covered us and gone away again: pause → resume while armed. The
+    // ON_RESUME delivered on attach is a no-op (nothing paused yet).
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> viewModel.handOffLeft()
+                Lifecycle.Event.ON_RESUME -> viewModel.handOffReturned()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // Fallback: armed but never paused within the timeout — the SMS app
+    // didn't take over (disabled, or it bounced straight back).
+    val armedAt = (purchase as? Purchase.Armed)?.pending?.armedAt
+    androidx.compose.runtime.LaunchedEffect(armedAt) {
+        val wait = viewModel.handOffDeadlineIn() ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(wait)
+        viewModel.handOffTimedOut()
     }
 
     // Status-bar icons must follow what's painted behind them: the band's
@@ -194,13 +218,17 @@ fun ListkomatApp(viewModel: AppViewModel) {
                             if (!context.packageManager.hasSystemFeature(
                                     android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
                                 showingNoSms = true
-                            } else try {
-                                context.startActivity(
-                                    SmsPurchase.intent(currentCity.smsNumber, ticket.code))
-                                viewModel.smsHandedOff(currentCity, ticket)
-                            } catch (e: ActivityNotFoundException) {
-                                Toast.makeText(context,
-                                    context.getString(R.string.no_sms_app), Toast.LENGTH_LONG).show()
+                            } else if (viewModel.smsHandedOff(currentCity, ticket)) {
+                                // Armed (and persisted) before we leave, so even
+                                // an immediate process death is remembered.
+                                try {
+                                    context.startActivity(
+                                        SmsPurchase.intent(currentCity.smsNumber, ticket.code))
+                                } catch (e: ActivityNotFoundException) {
+                                    viewModel.handOffFailed()
+                                } catch (e: SecurityException) {
+                                    viewModel.handOffFailed()
+                                }
                             }
                         },
                     )
@@ -256,13 +284,16 @@ fun ListkomatApp(viewModel: AppViewModel) {
                 onDismiss = { showingPicker = false },
             )
         }
-        pendingPurchase?.let { pending ->
-            SmsSentDialog(
-                city = pending.city,
-                ticket = pending.ticket,
+        when (val p = purchase) {
+            is Purchase.AwaitingAnswer -> SmsSentDialog(
                 onSent = confirmPurchase,
                 onNotSent = viewModel::purchaseDismissed,
             )
+            is Purchase.Armed -> if (p.timedOut) {
+                SmsFailedAlert(onDismiss = viewModel::handOffFailureAcknowledged)
+            }
+            Purchase.Failed -> SmsFailedAlert(onDismiss = viewModel::handOffFailureAcknowledged)
+            null -> {}
         }
     }
 }
@@ -315,9 +346,20 @@ private fun LocationPrimer(onContinue: () -> Unit) {
     )
 }
 
+/** iOS parity: .deviceCannotSendSMS is an alert, not a toast. */
+@Composable
+private fun SmsFailedAlert(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sms_impossible_title)) },
+        text = { Text(stringResource(R.string.sms_no_app)) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
+}
+
 /** Asked when the user comes back from the SMS app — ACTION_SENDTO reports nothing. */
 @Composable
-private fun SmsSentDialog(city: City, ticket: Ticket, onSent: () -> Unit, onNotSent: () -> Unit) {
+private fun SmsSentDialog(onSent: () -> Unit, onNotSent: () -> Unit) {
     AlertDialog(
         onDismissRequest = onNotSent,
         title = { Text(stringResource(R.string.sms_sent_title)) },
