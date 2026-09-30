@@ -9,3 +9,7 @@ local.properties
 # signing material — never commit
 upload-keystore.jks
 keystore.properties
+
+# Claude Code
+.claude/settings.local.json
+.claude/worktrees/
