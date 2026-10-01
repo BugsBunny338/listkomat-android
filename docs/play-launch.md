@@ -21,13 +21,13 @@ agent can automate once the account exists.
    email list. (Verify the exact tester count in the console; Google tweaks it.)
 5. **App signing**: accept Play App Signing (default). We'll upload an AAB
    signed with an upload key the agent can generate locally.
-6. **Google Maps API key** (recommended — this is what makes the live map
-   pretty): in Google Cloud Console create a project, enable *Maps SDK for
-   Android*, create an API key restricted to the app's package name +
-   signing-cert SHA-1. The free monthly credit comfortably covers a personal
-   app. Until then the map uses OSM tiles (functional but visually loud —
-   Carto's clean tiles turned out to watermark without a key, tried
-   2026-08-31). The swap is contained to `ui/LiveMapScreen.kt`.
+6. **Map tiles — nothing to set up.** The live map is MapLibre Native
+   (open source, BSD-2) rendering OpenFreeMap vector tiles: no API key, no
+   account. The Google Maps SDK was rejected on 2026-09-30 because it sends
+   Google the IP address, device metadata, an identifier and crash traces,
+   which would end "no data collected" on the Data safety form (android#22).
+   The style URLs at the top of `ui/TransitMap.kt` are the single switch
+   if the tiles ever move to self-hosting.
 
 ## Release automation (LIVE since 2026-09-23)
 

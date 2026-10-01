@@ -1,8 +1,5 @@
 package cz.flipcom.listkomat.ui
 
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -55,9 +52,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,7 +63,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -73,38 +70,28 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.LiveSources
-import cz.flipcom.listkomat.data.Stop
 import cz.flipcom.listkomat.data.StopNamesStore
 import cz.flipcom.listkomat.data.StopsStore
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.City
-import cz.flipcom.listkomat.model.TransitPalette
 import cz.flipcom.listkomat.model.Vehicle
 import cz.flipcom.listkomat.model.VehicleKind
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import org.osmdroid.events.MapListener
-import org.osmdroid.events.ScrollEvent
-import org.osmdroid.events.ZoomEvent
-import org.osmdroid.config.Configuration
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.CustomZoomButtonsController
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Overlay
 
 /**
  * Full-screen live map for a city: vehicles coloured by the shared
  * TransitPalette, a selection card, a recenter button and a failure banner.
- * OpenStreetMap tiles via osmdroid (no API key; attribution shown) — the
- * vehicle data flows exactly like iOS: poll the shared source every 8 s
- * while the screen is started, keep the last positions on failure.
+ * OpenFreeMap vector tiles via MapLibre (TransitMap.kt; no API key,
+ * attribution shown) — the vehicle data flows exactly like iOS: poll the
+ * shared source every 8 s while the screen is started, keep the last
+ * positions on failure.
  *
  * Native chrome (brief B1): an opaque themed top bar with back + title +
  * data sources, the map below it running edge to edge under the gesture
@@ -116,28 +103,10 @@ private const val POLL_INTERVAL_MS = 8_000L
  *  never shows the hint, short enough to land well inside Brno's burst wait. */
 private const val SLOW_CONNECT_HINT_MS = 5_000L
 
-private const val DEFAULT_ZOOM = 13.2
-
-/** Where the map is looking; saved so rotation doesn't snap back to the city. */
-private class MapCamera(var lat: Double, var lng: Double, var zoom: Double) {
-    companion object {
-        val Saver = listSaver<MapCamera, Double>(
-            save = { listOf(it.lat, it.lng, it.zoom) },
-            restore = { MapCamera(it[0], it[1], it[2]) },
-        )
-    }
-}
-
-// Tile style: OSM Mapnik is the only clean-licence keyless option — Carto's
-// basemaps watermark without an API key (tried 2026-08-31). The visual
-// upgrade path is the Google Maps SDK once its API key exists (a manual
-// Play-launch step); the swap is contained to this file.
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val source = remember(city.key) { LiveSources.source(city.key) }
     // Re-entry (rotation, quick reopen) paints the source's recent positions
@@ -146,16 +115,13 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
     var vehicles by remember(city.key) { mutableStateOf(seeded ?: emptyList()) }
     var loadFailed by rememberSaveable { mutableStateOf(false) }
     var didLoadOnce by remember(city.key) { mutableStateOf(seeded != null) }
-    val camera = rememberSaveable(city.key, saver = MapCamera.Saver) {
-        MapCamera(city.lat, city.lng, DEFAULT_ZOOM)
-    }
     var selected by remember { mutableStateOf<Vehicle?>(null) }
     val stopNames = remember(city.key) {
         if (city.key == "brno") StopNamesStore.brno(context) else emptyMap()
     }
     val stops = remember(city.key) { StopsStore.forCity(context, city.key) }
     val accent = MaterialTheme.colorScheme.primary
-    var mapRef by remember { mutableStateOf<MapView?>(null) }
+    var recenter by remember { mutableIntStateOf(0) }
     var showingSources by remember { mutableStateOf(false) }
 
     // Interest keeps the source's connection up; leaving (or rotating) starts
@@ -181,12 +147,6 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
             }
         }
     }
-
-    val overlay = remember {
-        // A tap on empty map clears the selection (iOS dismisses the same way).
-        VehiclesOverlay(density.density) { selected = it }
-    }
-    val accentArgb = accent.toArgb()
 
     // Same band as the home screen's bar, so the status-bar tint set in
     // ListkomatApp stays right while the map is up.
@@ -224,50 +184,19 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
         // Only the top inset is consumed: the map itself runs under the
         // gesture bar, and the overlays below pad for it instead.
         Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
-            AndroidView(
-                factory = { ctx ->
-                    Configuration.getInstance().userAgentValue = ctx.packageName
-                    MapView(ctx).apply {
-                        setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        // osmdroid's legacy ± buttons: pinch is the gesture
-                        // everyone knows (feedback round 2); D-pad keys still zoom.
-                        zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-                        controller.setZoom(camera.zoom)
-                        controller.setCenter(GeoPoint(camera.lat, camera.lng))
-                        addMapListener(object : MapListener {
-                            override fun onScroll(event: ScrollEvent?) = record()
-                            override fun onZoom(event: ZoomEvent?) = record()
-                            // Before the first layout the centre isn't real yet.
-                            private fun record(): Boolean {
-                                if (isLayoutOccurred) {
-                                    camera.lat = mapCenter.latitude
-                                    camera.lng = mapCenter.longitude
-                                    camera.zoom = zoomLevelDouble
-                                }
-                                return false
-                            }
-                        })
-                        overlays.add(overlay)
-                        mapRef = this
-                    }
-                },
-                // The overlay is a plain View-side object, so the map only repaints
-                // when told to. Feeding it inside `update` makes this lambda read
-                // the vehicle state, so Compose re-runs it — and the invalidate —
-                // on every poll. Assigning during composition (the old code) never
-                // invalidated: with a warm tile cache nothing else repainted the
-                // map either, and the fleet stayed invisible until a touch
-                // (issue #2 — the "R8 bug" that reproduced on any warm reopen).
-                update = { map ->
-                    overlay.vehicles = vehicles
-                    overlay.stops = stops
-                    overlay.accent = accentArgb
-                    map.invalidate()
-                },
-                onRelease = { it.onDetach() },
-                modifier = Modifier.fillMaxSize(),
-            )
+            // A city change while the map is up builds a fresh map for it.
+            key(city.key) {
+                TransitMap(
+                    city = city,
+                    vehicles = vehicles,
+                    stops = stops,
+                    accent = accent,
+                    recenter = recenter,
+                    // A tap on empty map clears the selection (iOS dismisses the same way).
+                    onSelect = { selected = it },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             NavigationBarScrim(Modifier.align(Alignment.BottomCenter))
             MapOverlays(
                 city = city,
@@ -278,9 +207,7 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
                 selected = selected,
                 stopNames = stopNames,
                 onDismissSelection = { selected = null },
-                onRecenter = {
-                    mapRef?.controller?.animateTo(GeoPoint(city.lat, city.lng), DEFAULT_ZOOM, 400L)
-                },
+                onRecenter = { recenter++ },
             )
         }
     }
@@ -299,7 +226,7 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
 }
 
 /**
- * Keeps the gesture pill / nav buttons legible over light tiles;
+ * Keeps the gesture pill / nav buttons legible over the tiles;
  * ListkomatApp sets their light/dark appearance to match.
  */
 @Composable
@@ -343,9 +270,10 @@ private fun MapOverlays(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
     ) {
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(8.dp)) {
-            // Attribution — required by the OSM tile usage policy.
+            // Attribution — required by OpenFreeMap, OpenMapTiles and OSM.
+            // MapLibre's own logo and attribution button are off; this is it.
             Text(
-                "© OpenStreetMap contributors",
+                "© OpenFreeMap © OpenMapTiles © OpenStreetMap",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -492,93 +420,4 @@ private fun kindDisplayName(kind: VehicleKind, brno: Boolean): String {
         VehicleKind.TRAIN -> R.string.kind_train
         VehicleKind.FERRY -> R.string.kind_ferry
     })
-}
-
-/**
- * Draws every vehicle as a palette-coloured disc with its line glyph — one
- * canvas pass, no per-vehicle marker objects (hundreds of vehicles at 8 s
- * cadence would churn osmdroid's marker machinery).
- */
-private class VehiclesOverlay(
-    private val density: Float,
-    /** The tapped vehicle, or null for a tap on empty map. */
-    private val onSelect: (Vehicle?) -> Unit,
-) : Overlay() {
-    var vehicles: List<Vehicle> = emptyList()
-    var stops: List<Stop> = emptyList()
-    var accent: Int = android.graphics.Color.rgb(86, 196, 207)
-
-    /** iOS parity: stops appear once zoomed past ~city scale, capped — they're
-     *  context, fewer than vehicles. */
-    private val stopZoomThreshold = 15.0
-    private val stopCap = 150
-
-    private val stopFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
-    }
-    private val stopRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-    }
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        color = android.graphics.Color.WHITE
-    }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-    }
-    private val pt = android.graphics.Point()
-
-    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
-        if (shadow) return
-        val r = 9f * density
-        ringPaint.strokeWidth = 1.5f * density
-        textPaint.textSize = 8.5f * density
-        val proj = mapView.projection
-        if (mapView.zoomLevelDouble >= stopZoomThreshold && stops.isNotEmpty()) {
-            val r2 = 3.5f * density
-            stopRing.strokeWidth = 1.5f * density
-            stopRing.color = accent
-            val bounds = mapView.boundingBox
-            var drawn = 0
-            for (st in stops) {
-                if (drawn >= stopCap) break
-                if (st.lat !in bounds.latSouth..bounds.latNorth ||
-                    st.lng !in bounds.lonWest..bounds.lonEast) continue
-                proj.toPixels(GeoPoint(st.lat, st.lng), pt)
-                canvas.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r2, stopFill)
-                canvas.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r2, stopRing)
-                drawn++
-            }
-        }
-        // Freshest-first list: draw oldest first so fresh markers sit on top.
-        for (v in vehicles.asReversed()) {
-            proj.toPixels(GeoPoint(v.lat, v.lng), pt)
-            if (pt.x < -50 || pt.y < -50 ||
-                pt.x > canvas.width + 50 || pt.y > canvas.height + 50) continue
-            val style = TransitPalette.style(v.kind, v.line)
-            fillPaint.color = style.fill.toArgb()
-            textPaint.color = style.glyph.toArgb()
-            canvas.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r, fillPaint)
-            canvas.drawCircle(pt.x.toFloat(), pt.y.toFloat(), r, ringPaint)
-            canvas.drawText(v.line.take(3), pt.x.toFloat(),
-                pt.y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
-        }
-    }
-
-    override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
-        val proj = mapView.projection
-        val touchR = 20f * density
-        var best: Vehicle? = null
-        var bestD = Float.MAX_VALUE
-        for (v in vehicles) {
-            proj.toPixels(GeoPoint(v.lat, v.lng), pt)
-            val dx = e.x - pt.x; val dy = e.y - pt.y
-            val d = dx * dx + dy * dy
-            if (d < bestD && d <= touchR * touchR) { bestD = d; best = v }
-        }
-        onSelect(best)
-        return best != null
-    }
 }
