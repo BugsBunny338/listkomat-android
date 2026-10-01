@@ -6,14 +6,19 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.view.View
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.createBitmap
 import androidx.core.view.doOnLayout
@@ -21,10 +26,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import cz.flipcom.listkomat.data.LiveSources
 import cz.flipcom.listkomat.data.Stop
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.TransitPalette
 import cz.flipcom.listkomat.model.Vehicle
+import java.io.IOException
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.log2
@@ -46,6 +53,10 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Request
+import okhttp3.Response
 
 /**
  * The live map's basemap and markers: MapLibre Native rendering OpenFreeMap
@@ -67,10 +78,13 @@ internal const val INITIAL_LAT_SPAN = 0.05
 internal const val RECENTER_LAT_SPAN = 0.03
 internal const val STOP_LAT_SPAN = 0.035
 
-/** The A14's map area in portrait (856 dp screen minus status and top bars).
- *  Stops get a fixed minZoom from it, so rotation doesn't change when they
- *  appear; a GPU circle layer needs no cap. */
+/** The A14's map area in portrait (856 dp screen minus status and top
+ *  bars): the height assumed until the map view has been laid out. */
 internal const val REFERENCE_MAP_HEIGHT_DP = 764.0
+
+/** How often a map stuck on the offline fallback style checks whether the
+ *  real style is reachable again. */
+private const val STYLE_RETRY_MS = 10_000L
 
 /**
  * Zoom at which [latSpan] degrees of latitude fill [heightDp] around [lat].
@@ -117,10 +131,15 @@ fun TransitMap(
     }
     // The app's own appearance mode, not the system's (same signal as the
     // navigation-bar scrim).
-    val surface = MaterialTheme.colorScheme.surface
-    val styleUrl = if (surface.luminance() < 0.5f) STYLE_DARK else STYLE_LIGHT
-    val surfaceArgb = surface.toArgb()
+    val styleUrl = if (surfaceIsDark()) STYLE_DARK else STYLE_LIGHT
+    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val accentArgb = accent.toArgb()
+    // The map runs edge to edge, so MapLibre's compass must clear a side
+    // navigation bar or cutout in landscape by itself.
+    val density = LocalDensity.current
+    val dir = LocalLayoutDirection.current
+    val endInsetPx = if (dir == LayoutDirection.Rtl) WindowInsets.safeDrawing.getLeft(density, dir)
+                     else WindowInsets.safeDrawing.getRight(density, dir)
 
     AndroidView(
         factory = { ctx ->
@@ -134,13 +153,18 @@ fun TransitMap(
             view.tag = TransitMapController(view, city, camera, recenter, lifecycleOwner)
             view
         },
-        // Every input is applied here, so this lambda reads the vehicle state
-        // and Compose re-runs it on every poll. setGeoJson repaints by itself;
-        // nothing may wait for a touch to show the fleet (issue #2 — a warm
-        // reopen with nothing else to redraw left it invisible).
+        // Every input is pushed to the map here. Each poll hands TransitMap a
+        // new vehicle list, the recomposition passes AndroidView a new update
+        // lambda, and AndroidView re-runs it, so the fleet reaches the map on
+        // every poll. setGeoJson repaints by itself; nothing may wait for a
+        // touch to show the fleet (issue #2 — a warm reopen with nothing else
+        // to redraw left it invisible). Keep the vehicles flowing through
+        // this lambda's inputs.
         update = { view ->
             (view.tag as TransitMapController).apply {
                 this.onSelect = onSelect
+                fallbackBackground = surfaceArgb
+                setCompassEndInset(endInsetPx)
                 setStyleUrl(styleUrl)
                 setStops(stops)
                 setAccent(accentArgb)
@@ -167,10 +191,11 @@ private class TransitMapController(
 ) {
     var onSelect: (Vehicle?) -> Unit = {}
 
+    /** Background of the offline fallback style: the app's surface. */
+    var fallbackBackground = 0
+
     private val density = view.resources.displayMetrics.density
     private val densityDpi = view.resources.displayMetrics.densityDpi
-    private val stopMinZoom =
-        zoomForLatSpan(STOP_LAT_SPAN, city.lat, REFERENCE_MAP_HEIGHT_DP).toFloat()
 
     private var map: MapLibreMap? = null
     private var styleUrl: String? = null
@@ -179,9 +204,17 @@ private class TransitMapController(
     /** Vehicle icons registered with [style]; they vanish with it. */
     private val images = HashSet<String>()
     private var framed = false
+    /** On the blank local style because the real one failed to load. */
+    private var onFallback = false
+    private val retryStyle = Runnable { preflightStyle() }
+    private var recenterNonce = lastRecenter
+    private var compassEndInset = 0
 
     private var vehicles: List<Vehicle> = emptyList()
-    private var byId: Map<String, Vehicle> = emptyMap()
+    /** Lists, because a feed may carry an id twice; a tap tests each. */
+    private var byId: Map<String, List<Vehicle>> = emptyMap()
+    /** Icon name per (kind, line), so a poll formats no strings. */
+    private val iconNames = HashMap<String, String>()
     private var stops: List<Stop> = emptyList()
     private var accent = 0
 
@@ -200,12 +233,21 @@ private class TransitMapController(
             map = m
             configure(m)
             styleUrl?.let { load(m, it) }
+            applyRecenter()   // a press made before the map was ready
+        }
+        // Stops appear below a visible latitude span (iOS), so their minZoom
+        // follows the map's height — rotation included.
+        view.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top != oldBottom - oldTop) {
+                style?.getLayerAs<CircleLayer>(STOP_LAYER)?.minZoom = stopMinZoom()
+            }
         }
     }
 
     fun destroy() {
         lifecycleOwner.lifecycle.removeObserver(lifecycle)
         view.context.applicationContext.unregisterComponentCallbacks(memory)
+        view.removeCallbacks(retryStyle)
         lifecycle.moveTo(Lifecycle.State.DESTROYED)
         map = null
         style = null
@@ -220,6 +262,7 @@ private class TransitMapController(
             isRotateGesturesEnabled = true
             isCompassEnabled = true
         }
+        placeCompass(m)
         if (!camera.zoom.isNaN()) {
             m.cameraPosition = CameraPosition.Builder()
                 .target(LatLng(camera.lat, camera.lng))
@@ -237,6 +280,20 @@ private class TransitMapController(
         }
         m.addOnCameraIdleListener { record(m) }
         m.addOnMapClickListener { tap(m, it) }
+        view.addOnDidFailLoadingMapListener { styleFailed(m) }
+    }
+
+    fun setCompassEndInset(px: Int) {
+        if (px == compassEndInset) return
+        compassEndInset = px
+        map?.let { placeCompass(it) }
+    }
+
+    private fun placeCompass(m: MapLibreMap) {
+        val margin = (8 * density).toInt()
+        val end = margin + compassEndInset
+        val rtl = view.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        m.uiSettings.setCompassMargins(if (rtl) end else margin, margin, if (rtl) margin else end, margin)
     }
 
     /** Before the first framing the camera is MapLibre's default, not ours. */
@@ -250,15 +307,28 @@ private class TransitMapController(
         camera.bearing = p.bearing
     }
 
-    private fun zoomFor(latSpan: Double): Double =
-        zoomForLatSpan(latSpan, city.lat, view.height / density.toDouble())
+    private fun mapHeightDp(): Double =
+        if (view.height > 0) view.height / density.toDouble() else REFERENCE_MAP_HEIGHT_DP
+
+    private fun zoomFor(latSpan: Double): Double = zoomForLatSpan(latSpan, city.lat, mapHeightDp())
+
+    private fun stopMinZoom(): Float = zoomFor(STOP_LAT_SPAN).toFloat()
 
     fun recenterIfBumped(nonce: Int) {
-        if (nonce == lastRecenter) return
-        lastRecenter = nonce
+        recenterNonce = nonce
+        applyRecenter()
+    }
+
+    /** Back to the city, north up (the FAB). */
+    private fun applyRecenter() {
         val m = map ?: return
-        m.animateCamera(CameraUpdateFactory.newLatLngZoom(
-            LatLng(city.lat, city.lng), zoomFor(RECENTER_LAT_SPAN)), 400)
+        if (recenterNonce == lastRecenter) return
+        lastRecenter = recenterNonce
+        m.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder()
+            .target(LatLng(city.lat, city.lng))
+            .zoom(zoomFor(RECENTER_LAT_SPAN))
+            .bearing(0.0)
+            .build()), 400)
     }
 
     fun setStyleUrl(url: String) {
@@ -270,24 +340,79 @@ private class TransitMapController(
     private fun load(m: MapLibreMap, url: String) {
         style = null
         images.clear()
+        onFallback = false
+        view.removeCallbacks(retryStyle)
         m.setStyle(Style.Builder().fromUri(url)) { s ->
             // A newer switch may have overtaken this load.
-            if (url != styleUrl || map == null) return@setStyle
-            style = s
-            // Placement fades re-fade symbols the 8 s update re-places, so
-            // some vehicles blinked on every poll; positions just swap now.
-            s.transition = TransitionOptions(300, 0, false)
+            if (url != styleUrl || map == null || onFallback) return@setStyle
             hidePointsOfInterest(s)
-            addLayers(s)
-            pushStops(s)
-            pushVehicles(s)
+            adopt(s)
         }
+    }
+
+    /** Sources and layers onto a freshly loaded style, then the current data. */
+    private fun adopt(s: Style) {
+        style = s
+        // Placement fades re-fade symbols the 8 s update re-places, so
+        // some vehicles blinked on every poll; positions just swap now.
+        s.transition = TransitionOptions(300, 0, false)
+        addLayers(s)
+        pushStops(s)
+        pushVehicles(s)
+    }
+
+    /**
+     * The real style didn't load (offline with nothing cached, or OpenFreeMap
+     * down — it has no uptime guarantee). Vehicles must still show, as they
+     * did over osmdroid's blank tiles: switch to a local blank style carrying
+     * our layers, and go back to the real one once it answers again.
+     */
+    private fun styleFailed(m: MapLibreMap) {
+        if (style != null || onFallback) return   // a loaded style keeps working
+        onFallback = true
+        images.clear()
+        val bg = String.format("#%06X", fallbackBackground and 0xFFFFFF)
+        val json = """{"version":8,"sources":{},"layers":[""" +
+            """{"id":"background","type":"background","paint":{"background-color":"$bg"}}]}"""
+        m.setStyle(Style.Builder().fromJson(json)) { s ->
+            if (!onFallback || map == null) return@setStyle
+            adopt(s)
+        }
+        view.postDelayed(retryStyle, STYLE_RETRY_MS)
+    }
+
+    /** One cheap request to the style URL; only a success swaps the style
+     *  back (a failing setStyle would blank the vehicles while it tries). */
+    private fun preflightStyle() {
+        val url = styleUrl ?: return
+        if (!onFallback || map == null) return
+        LiveSources.client.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                view.post { retryLater() }
+            }
+            override fun onResponse(call: Call, response: Response) {
+                // Status only; the body stays unread. Nothing here may throw,
+                // or OkHttp swallows it and the retry loop stops.
+                val ok = runCatching { response.use { it.isSuccessful } }.getOrDefault(false)
+                view.post { if (ok) reloadReal() else retryLater() }
+            }
+        })
+    }
+
+    private fun retryLater() {
+        if (onFallback && map != null) view.postDelayed(retryStyle, STYLE_RETRY_MS)
+    }
+
+    private fun reloadReal() {
+        val m = map ?: return
+        val url = styleUrl ?: return
+        if (onFallback) load(m, url)
     }
 
     fun setVehicles(list: List<Vehicle>) {
         if (list === vehicles) return
         vehicles = list
-        byId = list.associateBy { it.id }
+        byId = list.groupBy { it.id }
         style?.let { pushVehicles(it) }
     }
 
@@ -323,7 +448,7 @@ private class TransitMapController(
             PropertyFactory.circleColor(android.graphics.Color.WHITE),
             PropertyFactory.circleStrokeWidth(1.5f),
             PropertyFactory.circleStrokeColor(accent),
-        ).apply { minZoom = stopMinZoom })
+        ).apply { minZoom = stopMinZoom() })
         s.addSource(GeoJsonSource(VEHICLE_SOURCE))
         s.addLayer(SymbolLayer(VEHICLE_LAYER, VEHICLE_SOURCE).withProperties(
             PropertyFactory.iconImage(Expression.get("icon")),
@@ -362,12 +487,14 @@ private class TransitMapController(
 
     /** The image name for [v]'s disc, rendering it once per (fill, glyph, text). */
     private fun icon(v: Vehicle, fresh: HashMap<String, Bitmap>): String {
-        val style = TransitPalette.style(v.kind, v.line)
-        val fill = style.fill.toArgb()
-        val glyph = style.glyph.toArgb()
-        val text = v.line.take(3)
-        val name = "v:%08x:%08x:%s".format(fill, glyph, text)
-        if (name !in images && name !in fresh) fresh[name] = disc(fill, glyph, text)
+        val name = iconNames.getOrPut("${v.kind}|${v.line}") {
+            val marker = TransitPalette.style(v.kind, v.line)
+            "v:%08x:%08x:%s".format(marker.fill.toArgb(), marker.glyph.toArgb(), v.line.take(3))
+        }
+        if (name !in images && name !in fresh) {
+            val marker = TransitPalette.style(v.kind, v.line)
+            fresh[name] = disc(marker.fill.toArgb(), marker.glyph.toArgb(), v.line.take(3))
+        }
         return name
     }
 
@@ -410,12 +537,14 @@ private class TransitMapController(
         var best: Vehicle? = null
         var bestD = r * r
         for (f in hits) {
-            val v = f.getStringProperty("id")?.let { byId[it] } ?: continue
-            val q = proj.toScreenLocation(LatLng(v.lat, v.lng))
-            val dx = q.x - p.x
-            val dy = q.y - p.y
-            val d = dx * dx + dy * dy
-            if (d <= bestD) { bestD = d; best = v }
+            val candidates = f.getStringProperty("id")?.let { byId[it] } ?: continue
+            for (v in candidates) {
+                val q = proj.toScreenLocation(LatLng(v.lat, v.lng))
+                val dx = q.x - p.x
+                val dy = q.y - p.y
+                val d = dx * dx + dy * dy
+                if (d <= bestD) { bestD = d; best = v }
+            }
         }
         onSelect(best)
         return true

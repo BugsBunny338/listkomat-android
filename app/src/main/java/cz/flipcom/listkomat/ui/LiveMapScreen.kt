@@ -62,7 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -233,7 +232,7 @@ fun LiveMapScreen(city: City, theme: AppTheme, onBack: () -> Unit) {
 private fun NavigationBarScrim(modifier: Modifier) {
     val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val surface = MaterialTheme.colorScheme.surface
-    val scrim = if (surface.luminance() < 0.5f) Color.Black.copy(alpha = 0.35f)
+    val scrim = if (surfaceIsDark()) Color.Black.copy(alpha = 0.35f)
                 else surface.copy(alpha = 0.6f)
     // A thin gesture inset gets the fade above the pill; the tall 3-button bar
     // already has the system's contrast scrim, so it only needs its own height.
