@@ -68,7 +68,7 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.process)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.osmdroid)
+    implementation(libs.maplibre)
     implementation(libs.okhttp)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

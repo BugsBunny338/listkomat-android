@@ -83,6 +83,15 @@ track "Alpha" needs ~12 opted-in testers for 14 days before production.
   override throws `AbstractMethodError` at runtime.
 - The `gps` provider needs FINE location before API 31. Query
   `getProviders(true)` so you only ask providers the granted permission allows.
+- The live map is MapLibre Native + OpenFreeMap tiles (`ui/TransitMap.kt`).
+  Never add the Google Maps SDK or any `play-services-maps` dependency: it
+  sends Google device data and would end "no data collected" on the Play
+  Data safety form (decided 2026-09-30, android#22). Use the
+  `android-sdk-opengl` artifact: plain `android-sdk` is the Vulkan build since
+  13.0 and makes Vulkan 1.0 a required feature on Play. Stay on 13.0.x while
+  the app is on Kotlin 2.0, because 13.1+ pulls kotlin-stdlib 2.2, which crashes the
+  2.0.21 compiler. MapLibre's manifest adds FINE_LOCATION and WIFI_STATE;
+  `AndroidManifest.xml` removes them.
 - SMS purchase is an `smsto:` `ACTION_SENDTO` handoff. Never `SEND_SMS` /
   `SmsManager` (Play policy + product decision). The handoff reports nothing
   back; the "did you send it?" dialog appears on return from the SMS app.

@@ -6,7 +6,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -110,3 +112,12 @@ fun ListkomatTheme(
         content = content,
     )
 }
+
+/**
+ * Whether the app's surface is dark: the app's own appearance mode and theme,
+ * not the system's. The live map's basemap style and its navigation-bar scrim
+ * both follow this, so they can never disagree.
+ */
+@Composable
+@ReadOnlyComposable
+fun surfaceIsDark(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
