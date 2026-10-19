@@ -1,1 +1,1 @@
-První uzavřený test.
+Nová, přehlednější živá mapa.
