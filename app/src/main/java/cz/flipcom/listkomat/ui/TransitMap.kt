@@ -68,8 +68,9 @@ import okhttp3.Response
 // MapLibre + OpenFreeMap: keyless, and MapLibre sends nothing but tile
 // requests. The Google Maps SDK was rejected 2026-09-30: it would end "no data
 // collected" on the Play Data safety form. These URLs are the single switch
-// for self-hosted tiles later.
-private const val STYLE_LIGHT = "https://tiles.openfreemap.org/styles/positron"
+// for self-hosted tiles later. Light = Liberty, Jiri's pick over Positron and
+// Bright on 2026-10-19 (A14 comparison; same rendering cost as Positron).
+private const val STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty"
 private const val STYLE_DARK = "https://tiles.openfreemap.org/styles/dark"
 
 /** Visible latitude span (iOS TransitMapView): first framing, recenter, and
@@ -430,7 +431,7 @@ private class TransitMapController(
     }
 
     /** Shops, restaurants and the like (iOS: pointOfInterestFilter = .excludingAll).
-     *  Positron and Dark carry none today; Bright and Liberty do. */
+     *  Liberty (the light style) carries them; Dark carries none today. */
     private fun hidePointsOfInterest(s: Style) {
         for (layer in s.layers) {
             if (layer is SymbolLayer && layer.sourceLayer == "poi") {
