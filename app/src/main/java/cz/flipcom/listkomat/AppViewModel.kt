@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import cz.flipcom.listkomat.data.ActiveTicketStore
 import cz.flipcom.listkomat.data.CatalogStore
 import cz.flipcom.listkomat.data.LocationService
-import cz.flipcom.listkomat.notify.TicketNotifications
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
@@ -37,8 +36,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _refreshFailed = MutableStateFlow(false)
     val refreshFailed: StateFlow<Boolean> = _refreshFailed
 
-    private val _activeTicket = MutableStateFlow<ActiveTicket?>(null)
-    val activeTicket: StateFlow<ActiveTicket?> = _activeTicket
+    /** Process-wide, so the notification's buttons can change it too. */
+    private val tickets = TicketController.get(app)
+    val activeTicket: StateFlow<ActiveTicket?> = tickets.active
 
     /**
      * The SMS hand-off in flight. ACTION_SENDTO reports nothing back, so asking
@@ -56,7 +56,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         app.getSharedPreferences("foreign_sim_notice", Context.MODE_PRIVATE)
 
     private val statePrefs =
-        app.getSharedPreferences("app_state", Context.MODE_PRIVATE)
+        app.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
 
     /** Manual city selection, persisted. Null until the user picks one —
      *  the GPS-nearest default the iOS app has is a future feature here. */
@@ -64,15 +64,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         MutableStateFlow(statePrefs.getString("selected_city", null))
     val selectedCityKey: StateFlow<String?> = _selectedCityKey
 
-    private val _themeId = MutableStateFlow(statePrefs.getString("theme_id", "clean") ?: "clean")
+    private val _themeId = MutableStateFlow(statePrefs.getString(THEME_KEY, "clean") ?: "clean")
     val themeId: StateFlow<String> = _themeId
 
     private val _appearanceMode = MutableStateFlow(statePrefs.getString("appearance", null))
     val appearanceMode: StateFlow<String?> = _appearanceMode
 
     fun setTheme(id: String) {
-        statePrefs.edit().putString("theme_id", id).apply()
+        statePrefs.edit().putString(THEME_KEY, id).apply()
         _themeId.value = id
+        tickets.refresh()  // the ongoing notification carries the accent
     }
 
     fun setAppearanceMode(mode: String) {
@@ -134,11 +135,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         _catalog.value = catalogStore.loadCachedOrBundled()
-        _activeTicket.value = activeStore.load()?.takeIf {
-            // Drop long-expired tickets on launch; keep fresh ones so the
-            // "expired" state is visible briefly rather than vanishing.
-            System.currentTimeMillis() < it.timeline.endMs + EXPIRED_KEEP_MS
-        }
+        // Drops long-expired tickets (fresh ones stay, so the "expired" state
+        // is visible briefly rather than vanishing), re-arms the alarms a
+        // force-stop cleared and reposts the ongoing notification.
+        tickets.restore()
         viewModelScope.launch {
             val result = catalogStore.refresh(_catalog.value)
             _catalog.value = result.catalog
@@ -179,9 +179,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 durationMinutes = pending.durationMinutes,
             ),
         )
-        activeStore.save(ticket)
-        _activeTicket.value = ticket
-        TicketNotifications.scheduleExpiry(getApplication(), ticket)
+        tickets.start(ticket)
     }
 
     fun purchaseDismissed() {
@@ -189,22 +187,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Confirmation SMS arrived early — re-anchor validity to now. */
-    fun confirmNow() {
-        val current = _activeTicket.value ?: return
-        val updated = current.copy(timeline = current.timeline.confirmed(System.currentTimeMillis()))
-        activeStore.save(updated)
-        _activeTicket.value = updated
-        TicketNotifications.scheduleExpiry(getApplication(), updated)
-    }
+    fun confirmNow() = tickets.confirmNow()
 
-    fun endTicket() {
-        activeStore.clear()
-        _activeTicket.value = null
-        TicketNotifications.cancelExpiry(getApplication())
-    }
+    fun endTicket() = tickets.end()
 
-    private companion object {
-        /** How long an expired ticket stays visible after endMs. */
-        const val EXPIRED_KEEP_MS: Long = 60 * 60_000
+    /** Repost the ongoing notification for the current phase: on resume (the
+     *  inexact flip alarm may lag) and once notifications are allowed. */
+    fun refreshOngoing() = tickets.refresh()
+
+    companion object {
+        /** Also read by TicketController for the notification's accent. */
+        const val STATE_PREFS = "app_state"
+        const val THEME_KEY = "theme_id"
     }
 }

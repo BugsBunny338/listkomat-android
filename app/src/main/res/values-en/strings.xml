@@ -17,6 +17,9 @@
     <string name="notification_channel_ticket">Ticket</string>
     <string name="notification_expired_title">Ticket expired</string>
     <string name="notification_expired_body">Your ticket is no longer valid.</string>
+    <string name="notification_channel_ongoing">Active ticket</string>
+    <string name="ongoing_pending_title">Waiting for the confirmation SMS</string>
+    <string name="ongoing_pending_text">%1$s · valid from %2$s</string>
     <plurals name="duration_minutes">
         <item quantity="one">%d minute</item>
         <item quantity="other">%d minutes</item>

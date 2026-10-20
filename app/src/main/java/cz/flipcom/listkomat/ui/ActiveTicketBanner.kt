@@ -1,5 +1,6 @@
 package cz.flipcom.listkomat.ui
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,19 +20,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.model.ActiveTicket
 import kotlinx.coroutines.delay
-import java.text.DateFormat
 import java.util.Date
 
 /**
  * The in-app countdown for the one active ticket: pending ("waiting for
  * confirmation" + Confirm now) until validFrom, then time-left until endMs,
- * then an expired state. Android counterpart of the iOS banner + Live Activity
- * (a proper ongoing notification is a parity-phase item).
+ * then an expired state. Together with the ongoing notification
+ * (notify/TicketOngoing.kt), the Android counterpart of the iOS banner + Live
+ * Activity. This banner is the source of truth; the notification mirrors it.
  */
 @Composable
 fun ActiveTicketBanner(
@@ -83,7 +85,7 @@ fun ActiveTicketBanner(
                         )
                         Text(
                             stringResource(R.string.ticket_valid_until,
-                                DateFormat.getTimeInstance(DateFormat.SHORT)
+                                DateFormat.getTimeFormat(LocalContext.current)
                                     .format(Date(ticket.timeline.endMs))),
                             style = MaterialTheme.typography.bodySmall,
                         )

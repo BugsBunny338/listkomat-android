@@ -18,4 +18,6 @@ data class ActiveTicket(
     val ticketLabel: String,     // e.g. "90 min"
     val priceKc: Int,
     val timeline: TicketTimeline,
+    /** The user swiped the ongoing notification away; don't repost it. */
+    val ongoingDismissed: Boolean = false,
 )
