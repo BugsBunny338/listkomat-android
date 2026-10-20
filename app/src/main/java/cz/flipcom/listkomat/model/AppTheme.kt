@@ -101,6 +101,8 @@ object GlyphContrast {
      *  Scanner rounds and anti-aliased glyphs measure a little lower. */
     const val MIN_TEXT_CONTRAST = 4.6
 
+    internal const val LIGHTNESS_STEP = 0.005f
+
     /**
      * [accent] as text: darkened on light [surfaces], lightened on dark ones,
      * hue and saturation kept, by the smallest step that reads at
@@ -111,11 +113,12 @@ object GlyphContrast {
         val lums = surfaces.map(::relativeLuminance)
         fun reads(c: Color) = relativeLuminance(c).let { l -> lums.all { contrastRatio(l, it) >= MIN_TEXT_CONTRAST } }
         if (reads(accent)) return accent
-        val darken = lums.average() > 0.5
+        // Head for whichever extreme reads better against the worst surface.
+        val darken = lums.minOf { contrastRatio(0.0, it) } >= lums.minOf { contrastRatio(1.0, it) }
         val (h, s, l) = toHsl(accent)
         var step = 1
         while (step <= 200) {
-            val lightness = (if (darken) l - step * 0.005f else l + step * 0.005f).coerceIn(0f, 1f)
+            val lightness = (if (darken) l - step * LIGHTNESS_STEP else l + step * LIGHTNESS_STEP).coerceIn(0f, 1f)
             val candidate = fromHsl(h, s, lightness)
             if (reads(candidate) || lightness == 0f || lightness == 1f) return candidate
             step++
@@ -123,7 +126,7 @@ object GlyphContrast {
         return accent
     }
 
-    private fun toHsl(c: Color): Triple<Float, Float, Float> {
+    internal fun toHsl(c: Color): Triple<Float, Float, Float> {
         val max = maxOf(c.red, c.green, c.blue); val min = minOf(c.red, c.green, c.blue)
         val l = (max + min) / 2
         if (max == min) return Triple(0f, 0f, l)
@@ -137,7 +140,7 @@ object GlyphContrast {
         return Triple(h, s, l)
     }
 
-    private fun fromHsl(h: Float, s: Float, l: Float): Color {
+    internal fun fromHsl(h: Float, s: Float, l: Float): Color {
         if (s == 0f) return Color(l, l, l)
         val q = if (l < 0.5f) l * (1 + s) else l + s - l * s
         val p = 2 * l - q

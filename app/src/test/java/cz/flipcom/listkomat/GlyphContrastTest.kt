@@ -52,16 +52,26 @@ class GlyphContrastTest {
 
     @Test
     fun `the hue survives the adjustment`() {
-        val green = Color(0xFF4CC76A)
-        val text = GlyphContrast.readableText(green, lightSurfaces)
-        assertTrue("still green: $text", text.green > text.red && text.green > text.blue)
+        for (theme in AppTheme.presets) {
+            val (h0, s0, _) = GlyphContrast.toHsl(theme.accent)
+            val (h1, s1, _) = GlyphContrast.toHsl(GlyphContrast.readableText(theme.accent, lightSurfaces))
+            if (s0 == 0f) continue  // greys have no hue
+            assertEquals("${theme.id} hue", h0, h1, 0.005f)
+            assertEquals("${theme.id} saturation", s0, s1, 0.02f)
+        }
     }
 
     @Test
     fun `the change is the smallest that passes`() {
-        // One step less dark would fail: the default teal moves only as far as it must.
-        val tealDim = Color(0xFF2E8792)
-        val text = GlyphContrast.readableText(tealDim, lightSurfaces)
-        assertTrue(worst(text, lightSurfaces) < MIN_TEXT_CONTRAST + 0.25)
+        // One lightness step back towards the original must fail again.
+        for (theme in AppTheme.presets) for (surfaces in listOf(lightSurfaces, darkSurfaces)) {
+            val text = GlyphContrast.readableText(theme.accent, surfaces)
+            if (text == theme.accent) continue
+            val (h, sat, l) = GlyphContrast.toHsl(text)
+            val (_, _, l0) = GlyphContrast.toHsl(theme.accent)
+            val back = l + if (l0 > l) GlyphContrast.LIGHTNESS_STEP else -GlyphContrast.LIGHTNESS_STEP
+            val oneLess = GlyphContrast.fromHsl(h, sat, back)
+            assertTrue("${theme.id}: one step less still reads", worst(oneLess, surfaces) < MIN_TEXT_CONTRAST)
+        }
     }
 }
