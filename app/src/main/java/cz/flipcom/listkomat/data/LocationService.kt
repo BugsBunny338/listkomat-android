@@ -46,9 +46,11 @@ object LocationService {
         val providers = wanted.filter { it in usable }
         // Coarse clients rarely get a current fix (see CitySelection), so a
         // recent last-known one answers at once instead of after the timeout.
-        lastKnown(lm)?.takeIf { CitySelection.lastKnownIsFresh(ageMs(it)) }?.let {
-            Log.d(LOG_TAG, "location: last known ${it.provider} ${ageMs(it) / 1000} s old, used at once")
-            return it
+        val recent = lastKnown(lm)
+        val recentAge = recent?.let(::ageMs)
+        if (recent != null && recentAge != null && CitySelection.lastKnownIsFresh(recentAge)) {
+            Log.d(LOG_TAG, "location: last known ${describe(recent)}, used at once")
+            return recent
         }
         val startedNs = SystemClock.elapsedRealtimeNanos()
         val current = withTimeoutOrNull(15_000) {
@@ -74,13 +76,19 @@ object LocationService {
         }
         val last = lastKnown(lm)
         Log.d(LOG_TAG, "location: current fix ${current?.let { "${it.provider} after ${msSince(startedNs)} ms" } ?: "none in 15 s"}, " +
-            "last known ${last?.let { "${it.provider} ${ageMs(it) / 1000} s old" } ?: "none"}")
+            "last known ${last?.let(::describe) ?: "none"}")
         return current ?: last
     }
 
     private fun msSince(ns: Long) = (SystemClock.elapsedRealtimeNanos() - ns) / 1_000_000
 
-    private fun ageMs(location: Location) = msSince(location.elapsedRealtimeNanos)
+    /** Null when the provider left the monotonic timestamp out: age unknown,
+     *  so never fresh. */
+    private fun ageMs(location: Location): Long? =
+        location.elapsedRealtimeNanos.takeIf { it > 0 }?.let(::msSince)
+
+    private fun describe(location: Location) =
+        "${location.provider} ${ageMs(location)?.let { "${it / 1000} s old" } ?: "of unknown age"}"
 
     private suspend fun currentFrom(lm: LocationManager, provider: String, context: Context): Location? =
         if (Build.VERSION.SDK_INT >= 30) currentFromApi30(lm, provider, context)
@@ -124,5 +132,7 @@ object LocationService {
     @SuppressLint("MissingPermission")
     private fun lastKnown(lm: LocationManager): Location? =
         lm.allProviders.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
-            .maxByOrNull { it.time }
+            // The monotonic clock, like the age check: wall time jumps with
+            // clock changes and could rank an older fix first.
+            .maxByOrNull { it.elapsedRealtimeNanos }
 }

@@ -28,6 +28,10 @@ ADB=/opt/homebrew/share/android-commandlinetools/platform-tools/adb
   `adb` + `uiautomator dump`.
 - AVDs: `listkomat` (Pixel 7, API 35) and `api28` (Android 9, for the
   minSdk-26 code paths). Headless: `emulator -avd api28 -no-window`.
+- A last-known fix up to 15 min old wins at once (`CitySelection.LAST_KNOWN_MAX_AGE_MS`),
+  so a second `geo fix` to another city only takes effect once the first is
+  older than that, or after a cold boot (`emulator -avd … -no-snapshot-load`).
+  `adb logcat -s Listkomat` shows which path answered and how old the fix was.
 - `package cz.flipcom.listkomat`, minSdk 26, target/compile SDK 36.
 
 ## Build, test, lint
