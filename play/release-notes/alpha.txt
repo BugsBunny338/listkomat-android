@@ -1,1 +1,1 @@
-Nová, přehlednější živá mapa.
+Jízdenka teď žije i v oznámeních: odpočet, platnost a tlačítko Ukončit, i když je aplikace zavřená. Město se vybírá podle polohy. Lepší čitelnost barev ve všech motivech.
