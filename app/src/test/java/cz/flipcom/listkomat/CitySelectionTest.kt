@@ -57,6 +57,39 @@ class CitySelectionTest {
         assertNull(CitySelection.gpsCityKey(LocationState.Located("brno", 100.1)))
     }
 
+    // --- the short hold for a first fix, so the list doesn't swap in place --
+
+    @Test
+    fun `while the first fix is awaited the fallback is held back`() {
+        assertNull(CitySelection.cityKey(manual = null, location = LocationState.Searching,
+            fallback = "brno", awaitingFirstFix = true))
+    }
+
+    @Test
+    fun `once the hold is over the fallback shows`() {
+        assertEquals("brno", CitySelection.cityKey(manual = null, location = LocationState.Searching,
+            fallback = "brno", awaitingFirstFix = false))
+    }
+
+    @Test
+    fun `a manual pick is never held back`() {
+        assertEquals("brno", CitySelection.cityKey(manual = "brno", location = LocationState.Searching,
+            fallback = "brno", awaitingFirstFix = true))
+    }
+
+    @Test
+    fun `a fix that arrives during the hold shows straight away`() {
+        assertEquals("praha", CitySelection.cityKey(manual = null, location = inPrague,
+            fallback = "brno", awaitingFirstFix = true))
+    }
+
+    @Test
+    fun `a too-far fix during the hold still holds the fallback back`() {
+        // The view model ends the hold on any answer; this only covers the gap.
+        assertNull(CitySelection.cityKey(manual = null, location = inSaltLakeCity,
+            fallback = "brno", awaitingFirstFix = true))
+    }
+
     // --- does the manual pick survive a return to the app -----------------
 
     @Test

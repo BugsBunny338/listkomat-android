@@ -5,10 +5,12 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -238,34 +240,42 @@ fun ListkomatApp(viewModel: AppViewModel) {
                         },
                     )
                 } else {
-                    TicketListScreen(
-                        city = currentCity,
-                        updatedAt = catalog.updatedAt,
-                        staleHint = refreshFailed,
-                        showSimNotice = !simNoticeDismissed &&
-                            viewModel.shouldShowSimNotice(Locale.getDefault().language),
-                        onDismissSimNotice = viewModel::dismissSimNotice,
-                        onOpenMap = { showingMap = true },
-                        onBuy = { ticket ->
-                            // iOS parity: a device that can't send SMS at all (wifi
-                            // tablet) gets an explanation, not a dead intent.
-                            if (!context.packageManager.hasSystemFeature(
-                                    android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
-                                showingNoSms = true
-                            } else if (viewModel.smsHandedOff(currentCity, ticket)) {
-                                // Armed (and persisted) before we leave, so even
-                                // an immediate process death is remembered.
-                                try {
-                                    context.startActivity(
-                                        SmsPurchase.intent(currentCity.smsNumber, ticket.code))
-                                } catch (e: ActivityNotFoundException) {
-                                    viewModel.handOffFailed()
-                                } catch (e: SecurityException) {
-                                    viewModel.handOffFailed()
+                    // A city that changes by itself (a late fix) fades in, and
+                    // its rows ignore taps for a moment: a tap aimed at the
+                    // previous list must not buy a ticket for this one.
+                    Crossfade(targetState = currentCity, label = "city") { city ->
+                        val shownAt = remember(city.key) { SystemClock.uptimeMillis() }
+                        TicketListScreen(
+                            city = city,
+                            updatedAt = catalog.updatedAt,
+                            staleHint = refreshFailed,
+                            showSimNotice = !simNoticeDismissed &&
+                                viewModel.shouldShowSimNotice(Locale.getDefault().language),
+                            onDismissSimNotice = viewModel::dismissSimNotice,
+                            onOpenMap = { showingMap = true },
+                            onBuy = { ticket ->
+                                if (SystemClock.uptimeMillis() - shownAt < CITY_TAP_GUARD_MS) {
+                                    // Aimed at the list that was here a moment ago.
+                                } else if (!context.packageManager.hasSystemFeature(
+                                        android.content.pm.PackageManager.FEATURE_TELEPHONY)) {
+                                    // iOS parity: a device that can't send SMS at all (wifi
+                                    // tablet) gets an explanation, not a dead intent.
+                                    showingNoSms = true
+                                } else if (viewModel.smsHandedOff(city, ticket)) {
+                                    // Armed (and persisted) before we leave, so even
+                                    // an immediate process death is remembered.
+                                    try {
+                                        context.startActivity(
+                                            SmsPurchase.intent(city.smsNumber, ticket.code))
+                                    } catch (e: ActivityNotFoundException) {
+                                        viewModel.handOffFailed()
+                                    } catch (e: SecurityException) {
+                                        viewModel.handOffFailed()
+                                    }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -332,6 +342,9 @@ fun ListkomatApp(viewModel: AppViewModel) {
         }
     }
 }
+
+/** Taps on a city's rows count only this long after it appeared. */
+private const val CITY_TAP_GUARD_MS = 600L
 
 /** iOS parity: searching / denied / too-far each explain themselves. */
 @Composable

@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -112,9 +113,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState
 
+    /** True while this process's first fix may still beat the fallback. */
+    private val _awaitingFirstFix = MutableStateFlow(false)
+
     /** The city the home screen shows; null = an empty state explains why. */
     val cityKey: StateFlow<String?> =
-        combine(_manualCityKey, _locationState, _fallbackCityKey, CitySelection::cityKey)
+        combine(_manualCityKey, _locationState, _fallbackCityKey, _awaitingFirstFix, CitySelection::cityKey)
             .stateIn(viewModelScope, SharingStarted.Eagerly,
                 CitySelection.cityKey(_manualCityKey.value, _locationState.value, _fallbackCityKey.value))
 
@@ -159,10 +163,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun locate() {
         if (locating?.isActive == true) return
         // A fix from earlier in this process stays on screen while the new
-        // one comes in, rather than flashing the searching state.
-        if (_locationState.value !is LocationState.Located) {
+        // one comes in, rather than flashing the searching state. Without one,
+        // hold the fallback back briefly: the fix usually takes about a second,
+        // and a list that swaps cities under the thumb can sell the wrong ticket.
+        val hold = if (_locationState.value !is LocationState.Located) {
             _locationState.value = LocationState.Searching
-        }
+            _awaitingFirstFix.value = true
+            viewModelScope.launch {
+                delay(CitySelection.FIRST_FIX_HOLD_MS)
+                _awaitingFirstFix.value = false
+            }
+        } else null
         locating = viewModelScope.launch {
             val fix = runCatching { LocationService.coarseFix(getApplication()) }
                 .onFailure { if (it is CancellationException) throw it }
@@ -173,6 +184,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (nearest != null) {
                 _locationState.value = LocationState.Located(nearest.city.key, nearest.distanceKm)
             }
+            // After the fix lands, so the fallback never flashes in between.
+            hold?.cancel()
+            _awaitingFirstFix.value = false
         }
     }
 

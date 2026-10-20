@@ -15,14 +15,23 @@ sealed interface LocationState {
  * (denied, no fix, nearest city farther than [NearestCity.MAX_DEFAULT_DISTANCE_KM]).
  * Coming back to the app is a fresh context, except within [MANUAL_GRACE_MS]
  * of leaving it (or of the pick), so answering a text or sending the ticket
- * SMS doesn't flip the city. Pure for unit tests.
+ * SMS doesn't flip the city.
+ *
+ * So the list doesn't swap under the user's thumb, the fallback waits up to
+ * [FIRST_FIX_HOLD_MS] for this process's first fix; the searching state shows
+ * meanwhile. Pure for unit tests.
  */
 object CitySelection {
 
     const val MANUAL_GRACE_MS = 5 * 60 * 1000L
+    const val FIRST_FIX_HOLD_MS = 2_000L
 
-    fun cityKey(manual: String?, location: LocationState, fallback: String?): String? =
-        manual ?: gpsCityKey(location) ?: fallback
+    fun cityKey(
+        manual: String?,
+        location: LocationState,
+        fallback: String?,
+        awaitingFirstFix: Boolean = false,
+    ): String? = manual ?: gpsCityKey(location) ?: fallback.takeUnless { awaitingFirstFix }
 
     /** The GPS city, if it's close enough to plausibly be where the user is. */
     fun gpsCityKey(location: LocationState): String? =
