@@ -16,9 +16,12 @@ import java.util.Date
 /**
  * The silent, ongoing notification that carries the active ticket outside
  * the app. It is the Android counterpart of the iOS Live Activity. A
- * system chronometer counts down to validFrom while pending and to endMs
- * once valid, so nothing in the app ticks. The flip between the two phases
- * is a repost from the validFrom alarm (or Confirm now). Both phases time
+ * system chronometer counts down to endMs in both phases, so nothing in the
+ * app ticks. The flip between the phases is a repost from the validFrom
+ * alarm (or Confirm now) that changes only the text. The inexact alarm lands
+ * up to ~90 s after validFrom (0.75 × the 120 s buffer, measured 82–84 s).
+ * A countdown to validFrom would run past zero ("−1:24") in that gap, so
+ * the pending text names the start time instead. Both phases time
  * themselves out at endMs, so the notification is gone on the dot even when
  * the inexact alarms lag (or an OEM battery manager drops them). No
  * foreground service, no exact alarms, no per-minute updates.
@@ -85,20 +88,21 @@ object TicketOngoing {
             .setShowWhen(true)
             .setUsesChronometer(true)
             .setChronometerCountDown(true)
+            .setWhen(timeline.endMs)
 
+        val timeFormat = DateFormat.getTimeFormat(context)
         if (pending) {
+            val from = timeFormat.format(Date(timeline.validFromMs))
             builder
                 .setContentTitle(context.getString(R.string.ongoing_pending_title))
-                .setContentText(label)
-                .setWhen(timeline.validFromMs)
+                .setContentText(context.getString(R.string.ongoing_pending_text, label, from))
                 .addAction(0, context.getString(R.string.confirm_now),
                     action(context, TicketIntents.CONFIRM_NOW, CONFIRM_REQUEST_CODE))
         } else {
-            val until = DateFormat.getTimeFormat(context).format(Date(timeline.endMs))
+            val until = timeFormat.format(Date(timeline.endMs))
             builder
                 .setContentTitle(label)
                 .setContentText(context.getString(R.string.ticket_valid_until, until))
-                .setWhen(timeline.endMs)
         }
         builder.addAction(0, context.getString(R.string.end_ticket),
             action(context, TicketIntents.END, END_REQUEST_CODE))
