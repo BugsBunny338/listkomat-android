@@ -101,7 +101,9 @@ track "Alpha" needs ~12 opted-in testers for 14 days before production.
 
 ## Galaxy A14 (the test phone)
 
-Android 14 / One UI 6.0, 3-button navigation, default SMS app Google Messages.
+Android 15 / One UI 7, 3-button navigation, default SMS app Google Messages,
+no SIM. Google Messages refuses `smsto:` without a SIM, so purchase tests
+switch the SMS role to Samsung Messages (restore below).
 
 - `am kill` does nothing while another app is on top:
   `adb shell run-as cz.flipcom.listkomat kill -9 <pid>`.
@@ -113,6 +115,11 @@ Android 14 / One UI 6.0, 3-button navigation, default SMS app Google Messages.
   adb authorization after every OTA.
 - Per-app locale: `adb shell cmd locale set-app-locales cz.flipcom.listkomat --locales cs-CZ`
   (reset with `""`).
+- It has a secure lock. Turning the screen off locks it, and the keyguard
+  blanks screenshots and `uiautomator`, so lock-screen and reboot checks
+  need Jiri's PIN.
+- On API 36 (emulator) `uiautomator dump` fails while the shade is open;
+  tap by screenshot coordinates there.
 - Only one phone is connected at a time (A14 *or* the iPhone). Say which
   build you left installed.
 
