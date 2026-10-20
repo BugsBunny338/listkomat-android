@@ -56,7 +56,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         app.getSharedPreferences("foreign_sim_notice", Context.MODE_PRIVATE)
 
     private val statePrefs =
-        app.getSharedPreferences("app_state", Context.MODE_PRIVATE)
+        app.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
 
     /** Manual city selection, persisted. Null until the user picks one —
      *  the GPS-nearest default the iOS app has is a future feature here. */
@@ -64,14 +64,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         MutableStateFlow(statePrefs.getString("selected_city", null))
     val selectedCityKey: StateFlow<String?> = _selectedCityKey
 
-    private val _themeId = MutableStateFlow(statePrefs.getString("theme_id", "clean") ?: "clean")
+    private val _themeId = MutableStateFlow(statePrefs.getString(THEME_KEY, "clean") ?: "clean")
     val themeId: StateFlow<String> = _themeId
 
     private val _appearanceMode = MutableStateFlow(statePrefs.getString("appearance", null))
     val appearanceMode: StateFlow<String?> = _appearanceMode
 
     fun setTheme(id: String) {
-        statePrefs.edit().putString("theme_id", id).apply()
+        statePrefs.edit().putString(THEME_KEY, id).apply()
         _themeId.value = id
         tickets.refresh()  // the ongoing notification carries the accent
     }
@@ -194,4 +194,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Repost the ongoing notification for the current phase: on resume (the
      *  inexact flip alarm may lag) and once notifications are allowed. */
     fun refreshOngoing() = tickets.refresh()
+
+    companion object {
+        /** Also read by TicketController for the notification's accent. */
+        const val STATE_PREFS = "app_state"
+        const val THEME_KEY = "theme_id"
+    }
 }

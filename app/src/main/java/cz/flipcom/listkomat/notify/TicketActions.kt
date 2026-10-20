@@ -12,12 +12,14 @@ interface TicketActions {
     fun end()
     fun flipped()
     fun expired()
+    fun dismissed()
 }
 
 object TicketIntents {
     const val CONFIRM_NOW = "cz.flipcom.listkomat.action.CONFIRM_NOW"
     const val END = "cz.flipcom.listkomat.action.END"
     const val FLIP = "cz.flipcom.listkomat.action.FLIP"
+    const val DISMISSED = "cz.flipcom.listkomat.action.DISMISSED"
 
     /**
      * Routes an alarm or notification-button broadcast (both reach only our
@@ -30,6 +32,7 @@ object TicketIntents {
             CONFIRM_NOW -> target.confirmNow()
             END -> target.end()
             FLIP -> target.flipped()
+            DISMISSED -> target.dismissed()
             null -> target.expired()
             else -> return false
         }
@@ -37,8 +40,9 @@ object TicketIntents {
     }
 }
 
-/** The ongoing notification's buttons ("Potvrdit nyní", "Ukončit"). These
- *  work with the app dead; the process is started just for this. */
+/** The ongoing notification's buttons ("Potvrdit nyní", "Ukončit") and its
+ *  swipe-away. These work with the app dead; the process is started just
+ *  for this. */
 class TicketActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         TicketIntents.route(intent.action, TicketController.get(context))
@@ -53,7 +57,9 @@ class TicketBootReceiver : BroadcastReceiver() {
         // Exported for the system broadcasts, so anyone can send it an
         // explicit intent: act on nothing but those two.
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED ->
+            Intent.ACTION_BOOT_COMPLETED ->
+                TicketController.get(context).restore(afterBoot = true)
+            Intent.ACTION_MY_PACKAGE_REPLACED ->
                 TicketController.get(context).restore()
         }
     }

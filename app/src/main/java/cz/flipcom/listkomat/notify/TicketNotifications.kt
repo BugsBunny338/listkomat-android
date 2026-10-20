@@ -45,12 +45,12 @@ object TicketNotifications {
     }
 
     /** (Re)arms both alarms for [ticket]; the flip alarm only while pending. */
-    fun schedule(context: Context, ticket: ActiveTicket) {
+    fun schedule(context: Context, ticket: ActiveTicket, nowMs: Long) {
         ensureChannel(context)
         val am = context.getSystemService(AlarmManager::class.java)
         am.setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP, ticket.timeline.endMs, expiryIntent(context))
-        if (ticket.timeline.isPending(System.currentTimeMillis())) {
+        if (ticket.timeline.isPending(nowMs)) {
             am.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP, ticket.timeline.validFromMs, flipIntent(context))
         } else {

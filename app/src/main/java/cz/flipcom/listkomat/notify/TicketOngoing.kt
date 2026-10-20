@@ -10,7 +10,7 @@ import androidx.core.app.NotificationCompat
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.TicketPhase
-import java.text.DateFormat
+import android.text.format.DateFormat
 import java.util.Date
 
 /**
@@ -18,10 +18,10 @@ import java.util.Date
  * the app. It is the Android counterpart of the iOS Live Activity. A
  * system chronometer counts down to validFrom while pending and to endMs
  * once valid, so nothing in the app ticks. The flip between the two phases
- * is a repost from the validFrom alarm (or Confirm now). The valid phase
- * times itself out at endMs, so it is gone on the dot even when the inexact
- * expiry alarm lags. No foreground service, no exact alarms, no per-minute
- * updates.
+ * is a repost from the validFrom alarm (or Confirm now). Both phases time
+ * themselves out at endMs, so the notification is gone on the dot even when
+ * the inexact alarms lag (or an OEM battery manager drops them). No
+ * foreground service, no exact alarms, no per-minute updates.
  *
  * On API 36 it also asks to be promoted to a Live Update (status-bar chip,
  * top of the shade, lock screen). ProgressStyle was considered and left out:
@@ -34,6 +34,7 @@ object TicketOngoing {
     private const val NOTIFICATION_ID = 2
     private const val CONFIRM_REQUEST_CODE = 10
     private const val END_REQUEST_CODE = 11
+    private const val DISMISSED_REQUEST_CODE = 12
 
     /** Notification.EXTRA_REQUEST_PROMOTED_ONGOING. androidx.core 1.17's
      *  setRequestPromotedOngoing() sets this same extra. That version is not
@@ -78,6 +79,9 @@ object TicketOngoing {
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(TicketNotifications.openApp(context))
+            // Swipeable since API 34; remember it so reposts respect it.
+            .setDeleteIntent(action(context, TicketIntents.DISMISSED, DISMISSED_REQUEST_CODE))
+            .setTimeoutAfter(timeline.endMs - nowMs)
             .setShowWhen(true)
             .setUsesChronometer(true)
             .setChronometerCountDown(true)
@@ -90,12 +94,11 @@ object TicketOngoing {
                 .addAction(0, context.getString(R.string.confirm_now),
                     action(context, TicketIntents.CONFIRM_NOW, CONFIRM_REQUEST_CODE))
         } else {
-            val until = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(timeline.endMs))
+            val until = DateFormat.getTimeFormat(context).format(Date(timeline.endMs))
             builder
                 .setContentTitle(label)
                 .setContentText(context.getString(R.string.ticket_valid_until, until))
                 .setWhen(timeline.endMs)
-                .setTimeoutAfter(timeline.endMs - nowMs)
         }
         builder.addAction(0, context.getString(R.string.end_ticket),
             action(context, TicketIntents.END, END_REQUEST_CODE))

@@ -15,6 +15,7 @@ class TicketIntentsTest {
         override fun end() { calls += "end" }
         override fun flipped() { calls += "flipped" }
         override fun expired() { calls += "expired" }
+        override fun dismissed() { calls += "dismissed" }
     }
 
     private fun routed(action: String?): List<String> =
@@ -24,6 +25,11 @@ class TicketIntentsTest {
     fun `notification buttons route to confirm and end`() {
         assertEquals(listOf("confirmNow"), routed(TicketIntents.CONFIRM_NOW))
         assertEquals(listOf("end"), routed(TicketIntents.END))
+    }
+
+    @Test
+    fun `swiping the notification away routes to dismissed`() {
+        assertEquals(listOf("dismissed"), routed(TicketIntents.DISMISSED))
     }
 
     @Test
