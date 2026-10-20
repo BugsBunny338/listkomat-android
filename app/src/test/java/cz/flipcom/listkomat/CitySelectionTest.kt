@@ -90,6 +90,28 @@ class CitySelectionTest {
             fallback = "brno", awaitingFirstFix = true))
     }
 
+    // --- a recent last-known fix counts as GPS delivering -----------------
+
+    @Test
+    fun `a last-known fix minutes old is used right away`() {
+        assertEquals(true, CitySelection.lastKnownIsFresh(ageMs = 6 * 60_000L))
+    }
+
+    @Test
+    fun `a last-known fix at the age limit is still used`() {
+        assertEquals(true, CitySelection.lastKnownIsFresh(ageMs = CitySelection.LAST_KNOWN_MAX_AGE_MS))
+    }
+
+    @Test
+    fun `an older last-known fix waits for a current one first`() {
+        assertEquals(false, CitySelection.lastKnownIsFresh(ageMs = CitySelection.LAST_KNOWN_MAX_AGE_MS + 1))
+    }
+
+    @Test
+    fun `a last-known fix from the future (clock skew) is not trusted as fresh`() {
+        assertEquals(false, CitySelection.lastKnownIsFresh(ageMs = -1))
+    }
+
     // --- does the manual pick survive a return to the app -----------------
 
     @Test
