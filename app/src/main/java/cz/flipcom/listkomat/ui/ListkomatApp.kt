@@ -2,7 +2,10 @@ package cz.flipcom.listkomat.ui
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -17,7 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -48,20 +52,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import cz.flipcom.listkomat.AppViewModel
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.SmsPurchase
-import cz.flipcom.listkomat.AppViewModel.LocationState
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.AppearanceMode
 import cz.flipcom.listkomat.model.DurationFormat
+import cz.flipcom.listkomat.model.LocationState
 import cz.flipcom.listkomat.model.NearestCity
 import cz.flipcom.listkomat.model.Purchase
 import java.util.Locale
 
 /**
  * Mirrors the iOS flow: the home screen IS the current city's ticket list
- * (manual selection, persisted; the GPS-nearest default is a future feature),
- * with the city picker behind a top-bar action. First launch, with no city
- * picked yet, shows an empty state that opens the picker. iOS also has a
- * themes button up there — that arrives with the theme system.
+ * (the GPS-nearest city, or a manual pick — rules in CitySelection), with the
+ * city picker behind a top-bar action. With no city to show, an empty state
+ * explains why and opens the picker.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,17 +74,12 @@ fun ListkomatApp(viewModel: AppViewModel) {
     val refreshFailed by viewModel.refreshFailed.collectAsState()
     val activeTicket by viewModel.activeTicket.collectAsState()
     val purchase by viewModel.purchase.collectAsState()
-    val selectedCityKey by viewModel.selectedCityKey.collectAsState()
+    val cityKey by viewModel.cityKey.collectAsState()
     val simNoticeDismissed by viewModel.simNoticeDismissed.collectAsState()
 
     val locationState by viewModel.locationState.collectAsState()
 
-    // Manual selection wins; otherwise the GPS-nearest city, but only if it's
-    // close enough to plausibly be where the user actually is (iOS parity).
-    val locatedKey = (locationState as? LocationState.Located)
-        ?.takeIf { it.distanceKm <= NearestCity.MAX_DEFAULT_DISTANCE_KM }?.cityKey
-    val currentCity = catalog.cities.firstOrNull { it.key == selectedCityKey }
-        ?: catalog.cities.firstOrNull { it.key == locatedKey }
+    val currentCity = catalog.cities.firstOrNull { it.key == cityKey }
     var showingPicker by remember { mutableStateOf(false) }
     var showingPrimer by remember { mutableStateOf(false) }
     var showingTheme by remember { mutableStateOf(false) }
@@ -102,15 +100,15 @@ fun ListkomatApp(viewModel: AppViewModel) {
         ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.onLocationPermission(granted)
     }
-    // First run with no manual city: prime, then ask (iOS shows the primer
-    // whenever authorization is still undetermined).
-    androidx.compose.runtime.LaunchedEffect(selectedCityKey) {
-        if (selectedCityKey == null && locationState is LocationState.Idle) {
-            val ctx = context
+    // Nothing to show and never asked: prime, then ask (iOS shows the primer
+    // whenever authorization is still undetermined). With permission the
+    // view model locates by itself on every start.
+    androidx.compose.runtime.LaunchedEffect(cityKey == null) {
+        if (cityKey == null && locationState is LocationState.Idle) {
             val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-                ctx, Manifest.permission.ACCESS_COARSE_LOCATION
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (granted) viewModel.onLocationPermission(true) else showingPrimer = true
+            if (!granted) showingPrimer = true
         }
     }
 
@@ -184,8 +182,11 @@ fun ListkomatApp(viewModel: AppViewModel) {
                     title = { Text(stringResource(R.string.app_name)) },
                     navigationIcon = {
                         theme.mascot?.let { mascot ->
+                            val label = stringResource(R.string.rain_button)
                             IconButton(onClick = { rainNonce += 1 }) {
-                                Text(mascot, style = MaterialTheme.typography.titleLarge)
+                                // TalkBack says what it does, not the emoji's name.
+                                Text(mascot, style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.clearAndSetSemantics { contentDescription = label })
                             }
                         }
                     },
@@ -197,7 +198,8 @@ fun ListkomatApp(viewModel: AppViewModel) {
                                        else MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = { showingPicker = true }) {
-                            Icon(Icons.Filled.Place,
+                            // Buildings like iOS's building.2: a city, not a GPS pin.
+                            Icon(Icons.Outlined.LocationCity,
                                 contentDescription = stringResource(R.string.pick_city_button),
                                 tint = if (band != null) theme.onBand
                                        else MaterialTheme.colorScheme.primary)
@@ -225,6 +227,11 @@ fun ListkomatApp(viewModel: AppViewModel) {
                         cityName = { key -> catalog.cities.firstOrNull { it.key == key }
                             ?.name(Locale.getDefault().language) },
                         onPick = { showingPicker = true },
+                        onOpenSettings = {
+                            context.startActivity(Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", context.packageName, null)))
+                        },
                     )
                 } else {
                     TicketListScreen(
@@ -328,12 +335,14 @@ private fun EmptyState(
     state: LocationState,
     cityName: (String) -> String?,
     onPick: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val far = (state as? LocationState.Located)
         ?.takeIf { it.distanceKm > NearestCity.MAX_DEFAULT_DISTANCE_KM }
+    val denied = far == null && state is LocationState.Denied
     val title = when {
         far != null -> stringResource(R.string.empty_far)
-        state is LocationState.Denied -> stringResource(R.string.empty_denied)
+        denied -> stringResource(R.string.empty_denied)
         state is LocationState.Searching -> stringResource(R.string.empty_searching)
         else -> stringResource(R.string.empty_pick_city)
     }
@@ -352,7 +361,18 @@ private fun EmptyState(
                     textAlign = TextAlign.Center,
                 )
             }
+            if (denied) {
+                Text(
+                    stringResource(R.string.empty_denied_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Button(onClick = onPick) { Text(stringResource(R.string.pick_city_button)) }
+            if (denied) {
+                TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
+            }
         }
     }
 }

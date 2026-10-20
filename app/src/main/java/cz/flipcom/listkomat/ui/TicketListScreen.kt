@@ -125,7 +125,9 @@ fun TicketListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
-                        Text(DurationFormat.format(context, ticket.durationMinutes),
+                        // "Lístek na 30 minut": the plurals are accusative for this.
+                        Text(stringResource(R.string.ticket_for,
+                                DurationFormat.format(context, ticket.durationMinutes)),
                             style = MaterialTheme.typography.titleMedium)
                         ticket.note(language)?.let {
                             Text(

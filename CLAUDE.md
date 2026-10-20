@@ -125,9 +125,9 @@ switch the SMS role to Samsung Messages (restore below).
 
 ## Conventions
 
-- GitHub account is **BugsBunny338**. `gh` has two accounts and the active
-  one is global; a hub hook blocks `gh` until you run
-  `gh auth switch -u BugsBunny338`. Switch back to JiriAtZartico when done.
+- GitHub account is **BugsBunny338**. Plain `gh` is already right under
+  `~/prj` (a per-call token wrapper, see the hub CLAUDE.md). Never run
+  `gh auth switch`: it repoints every parallel session.
 - Push to `origin` right after committing to `main`; never auto-push WIP.
 - Code, comments, commits, PRs in English. UI is Czech-first (`values/`) with
   English (`values-en/`).
