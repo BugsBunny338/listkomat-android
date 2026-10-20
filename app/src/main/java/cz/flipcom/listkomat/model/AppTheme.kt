@@ -96,4 +96,60 @@ object GlyphContrast {
         val l = relativeLuminance(c)
         return if (contrastRatio(l, 1.0) >= contrastRatio(l, 0.0)) Color.White else Color.Black
     }
+
+    /** WCAG AA for body text is 4.5:1; a hair more because the Accessibility
+     *  Scanner rounds and anti-aliased glyphs measure a little lower. */
+    const val MIN_TEXT_CONTRAST = 4.6
+
+    /**
+     * [accent] as text: darkened on light [surfaces], lightened on dark ones,
+     * hue and saturation kept, by the smallest step that reads at
+     * [MIN_TEXT_CONTRAST] on every surface. Most theme colours are band
+     * colours, too light (or, in dark mode, too dark) to be text as they are.
+     */
+    fun readableText(accent: Color, surfaces: List<Color>): Color {
+        val lums = surfaces.map(::relativeLuminance)
+        fun reads(c: Color) = relativeLuminance(c).let { l -> lums.all { contrastRatio(l, it) >= MIN_TEXT_CONTRAST } }
+        if (reads(accent)) return accent
+        val darken = lums.average() > 0.5
+        val (h, s, l) = toHsl(accent)
+        var step = 1
+        while (step <= 200) {
+            val lightness = (if (darken) l - step * 0.005f else l + step * 0.005f).coerceIn(0f, 1f)
+            val candidate = fromHsl(h, s, lightness)
+            if (reads(candidate) || lightness == 0f || lightness == 1f) return candidate
+            step++
+        }
+        return accent
+    }
+
+    private fun toHsl(c: Color): Triple<Float, Float, Float> {
+        val max = maxOf(c.red, c.green, c.blue); val min = minOf(c.red, c.green, c.blue)
+        val l = (max + min) / 2
+        if (max == min) return Triple(0f, 0f, l)
+        val d = max - min
+        val s = if (l > 0.5f) d / (2 - max - min) else d / (max + min)
+        val h = when (max) {
+            c.red -> (c.green - c.blue) / d + (if (c.green < c.blue) 6 else 0)
+            c.green -> (c.blue - c.red) / d + 2
+            else -> (c.red - c.green) / d + 4
+        } / 6
+        return Triple(h, s, l)
+    }
+
+    private fun fromHsl(h: Float, s: Float, l: Float): Color {
+        if (s == 0f) return Color(l, l, l)
+        val q = if (l < 0.5f) l * (1 + s) else l + s - l * s
+        val p = 2 * l - q
+        fun channel(t0: Float): Float {
+            val t = (t0 + 1) % 1
+            return when {
+                t < 1f / 6 -> p + (q - p) * 6 * t
+                t < 1f / 2 -> q
+                t < 2f / 3 -> p + (q - p) * (2f / 3 - t) * 6
+                else -> p
+            }
+        }
+        return Color(channel(h + 1f / 3), channel(h), channel(h - 1f / 3))
+    }
 }

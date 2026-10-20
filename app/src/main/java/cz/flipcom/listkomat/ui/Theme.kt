@@ -99,12 +99,21 @@ fun ListkomatTheme(
     val accent = theme.accent
     // The clean/black looks keep the tuned teal scheme; a coloured band re-tints
     // the accent roles so the whole app reads as one theme (iOS parity).
-    val scheme = if (accent == Brand.teal) base else base.copy(
+    val tinted = if (accent == Brand.teal) base else base.copy(
         primary = accent,
-        onPrimary = GlyphContrast.readableGlyph(accent),
         primaryContainer = tintOver(base.surface, accent, 0.14f),
         onPrimaryContainer = base.onSurface,
         secondary = accent,
+    )
+    // primary is drawn as text (prices, links, headings) on the page, cards,
+    // the notice tint and sheets: shade it until it reads on all of them. The
+    // band in the top bar keeps the theme's own colour.
+    val textAccent = GlyphContrast.readableText(tinted.primary, listOf(
+        base.background, base.surfaceVariant, base.surfaceContainerLow, tinted.primaryContainer,
+    ))
+    val scheme = if (textAccent == base.primary) tinted else tinted.copy(
+        primary = textAccent,
+        onPrimary = GlyphContrast.readableGlyph(textAccent),
     )
     MaterialTheme(
         colorScheme = scheme,
