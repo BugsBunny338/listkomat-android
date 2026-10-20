@@ -74,8 +74,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  can't deliver ([CitySelection]). Builds before the rule persisted the
      *  pick under the same key, so it carries over as the fallback. */
     private val _fallbackCityKey = MutableStateFlow(statePrefs.getString(PICKED_CITY_KEY, null))
-    private var pickedAtMs: Long? =
-        statePrefs.getLong(PICKED_AT_KEY, 0L).takeIf { statePrefs.contains(PICKED_AT_KEY) }
+    /** When the manual override was last on screen: the pick, then every
+     *  departure from the app while it still overrode GPS. Persisted, so a
+     *  process death while away doesn't shorten the grace. */
+    private var overrideSeenAtMs: Long? =
+        statePrefs.getLong(OVERRIDE_SEEN_AT_KEY, 0L).takeIf { statePrefs.contains(OVERRIDE_SEEN_AT_KEY) }
 
     /** The same pick as a session override of GPS; set again from the
      *  persisted one on a start within the grace window. */
@@ -100,8 +103,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectCity(key: String) {
         val now = System.currentTimeMillis()
-        statePrefs.edit().putString(PICKED_CITY_KEY, key).putLong(PICKED_AT_KEY, now).apply()
-        pickedAtMs = now
+        statePrefs.edit().putString(PICKED_CITY_KEY, key).putLong(OVERRIDE_SEEN_AT_KEY, now).apply()
+        overrideSeenAtMs = now
         _fallbackCityKey.value = key
         _manualCityKey.value = key
     }
@@ -127,15 +130,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun onAppStarted() {
         _manualCityKey.value = CitySelection.overrideAfterStart(
-            _fallbackCityKey.value, pickedAtMs, System.currentTimeMillis())
+            _fallbackCityKey.value, overrideSeenAtMs, System.currentTimeMillis())
         val granted = ContextCompat.checkSelfPermission(
             getApplication(), Manifest.permission.ACCESS_COARSE_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED
         if (granted) locate()
     }
 
+    /** The grace counts from leaving, not from the pick: browsing for ten
+     *  minutes and then sending the ticket SMS must not flip the city. */
+    private fun onAppStopped() {
+        if (_manualCityKey.value == null) return
+        val now = System.currentTimeMillis()
+        statePrefs.edit().putLong(OVERRIDE_SEEN_AT_KEY, now).apply()
+        overrideSeenAtMs = now
+    }
+
     private val processObserver = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_START) onAppStarted()
+        when (event) {
+            Lifecycle.Event.ON_START -> onAppStarted()
+            Lifecycle.Event.ON_STOP -> onAppStopped()
+            else -> {}
+        }
     }
 
     private var locating: Job? = null
@@ -193,6 +209,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        super.onCleared()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver)
     }
 
@@ -251,6 +268,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val STATE_PREFS = "app_state"
         const val THEME_KEY = "theme_id"
         private const val PICKED_CITY_KEY = "selected_city"
-        private const val PICKED_AT_KEY = "selected_city_at"
+        private const val OVERRIDE_SEEN_AT_KEY = "selected_city_at"
     }
 }

@@ -61,58 +61,66 @@ class CitySelectionTest {
 
     @Test
     fun `a pick made moments ago survives a return to the app`() {
-        assertEquals("brno", CitySelection.overrideAfterStart(fallback = "brno", pickedAtMs = now - 10_000, nowMs = now))
+        assertEquals("brno", CitySelection.overrideAfterStart(fallback = "brno", lastSeenAtMs = now - 10_000, nowMs = now))
     }
 
     @Test
     fun `a pick just inside the grace window survives`() {
         assertEquals("brno",
-            CitySelection.overrideAfterStart(fallback = "brno", pickedAtMs = now - MANUAL_GRACE_MS + 1, nowMs = now))
+            CitySelection.overrideAfterStart(fallback = "brno", lastSeenAtMs = now - MANUAL_GRACE_MS + 1, nowMs = now))
     }
 
     @Test
     fun `a pick older than the grace window no longer overrides GPS`() {
-        assertNull(CitySelection.overrideAfterStart(fallback = "brno", pickedAtMs = now - MANUAL_GRACE_MS, nowMs = now))
+        assertNull(CitySelection.overrideAfterStart(fallback = "brno", lastSeenAtMs = now - MANUAL_GRACE_MS, nowMs = now))
     }
 
     @Test
     fun `a pick from before this rule (no timestamp) never overrides GPS`() {
-        assertNull(CitySelection.overrideAfterStart(fallback = "brno", pickedAtMs = null, nowMs = now))
+        assertNull(CitySelection.overrideAfterStart(fallback = "brno", lastSeenAtMs = null, nowMs = now))
     }
 
     @Test
     fun `a pick in the future (clock moved back) does not override GPS`() {
-        assertNull(CitySelection.overrideAfterStart(fallback = "brno", pickedAtMs = now + 60_000, nowMs = now))
+        assertNull(CitySelection.overrideAfterStart(fallback = "brno", lastSeenAtMs = now + 60_000, nowMs = now))
     }
 
     @Test
     fun `no pick at all means no override`() {
-        assertNull(CitySelection.overrideAfterStart(fallback = null, pickedAtMs = null, nowMs = now))
+        assertNull(CitySelection.overrideAfterStart(fallback = null, lastSeenAtMs = null, nowMs = now))
     }
 
     // --- the brief's device walkthrough, end to end ------------------------
 
     @Test
     fun `pick Brno abroad, come back after the grace window, still Brno`() {
-        val manual = CitySelection.overrideAfterStart("brno", pickedAtMs = now - 3_600_000, nowMs = now)
+        val manual = CitySelection.overrideAfterStart("brno", lastSeenAtMs = now - 3_600_000, nowMs = now)
         assertEquals("brno", CitySelection.cityKey(manual, inSaltLakeCity, fallback = "brno"))
     }
 
     @Test
     fun `pick Brno, then come back in Prague after the grace window, Prague wins`() {
-        val manual = CitySelection.overrideAfterStart("brno", pickedAtMs = now - 3_600_000, nowMs = now)
+        val manual = CitySelection.overrideAfterStart("brno", lastSeenAtMs = now - 3_600_000, nowMs = now)
         assertEquals("praha", CitySelection.cityKey(manual, inPrague, fallback = "brno"))
     }
 
     @Test
     fun `pick Brno in Prague, answer a text and come back, still Brno`() {
-        val manual = CitySelection.overrideAfterStart("brno", pickedAtMs = now - 60_000, nowMs = now)
+        val manual = CitySelection.overrideAfterStart("brno", lastSeenAtMs = now - 60_000, nowMs = now)
+        assertEquals("brno", CitySelection.cityKey(manual, inPrague, fallback = "brno"))
+    }
+
+    @Test
+    fun `pick Brno, browse for ten minutes, send the ticket SMS and come back, still Brno`() {
+        // The view model stamps lastSeenAtMs when the app goes to the background.
+        val leftForSms = now - 40_000
+        val manual = CitySelection.overrideAfterStart("brno", lastSeenAtMs = leftForSms, nowMs = now)
         assertEquals("brno", CitySelection.cityKey(manual, inPrague, fallback = "brno"))
     }
 
     @Test
     fun `pick Brno, revoke location, Brno without an empty state`() {
-        val manual = CitySelection.overrideAfterStart("brno", pickedAtMs = now - 3_600_000, nowMs = now)
+        val manual = CitySelection.overrideAfterStart("brno", lastSeenAtMs = now - 3_600_000, nowMs = now)
         assertEquals("brno", CitySelection.cityKey(manual, LocationState.Denied, fallback = "brno"))
     }
 }

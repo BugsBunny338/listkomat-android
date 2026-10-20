@@ -14,7 +14,8 @@ sealed interface LocationState {
  * only, and is persisted solely as the fallback for when GPS can't deliver
  * (denied, no fix, nearest city farther than [NearestCity.MAX_DEFAULT_DISTANCE_KM]).
  * Coming back to the app is a fresh context, except within [MANUAL_GRACE_MS]
- * of the pick, so answering a text doesn't flip the city. Pure for unit tests.
+ * of leaving it (or of the pick), so answering a text or sending the ticket
+ * SMS doesn't flip the city. Pure for unit tests.
  */
 object CitySelection {
 
@@ -29,9 +30,11 @@ object CitySelection {
             ?.takeIf { it.distanceKm <= NearestCity.MAX_DEFAULT_DISTANCE_KM }?.cityKey
 
     /** The manual override after the app comes to the foreground: the last
-     *  pick ([fallback]) while it is younger than the grace window, else none. */
-    fun overrideAfterStart(fallback: String?, pickedAtMs: Long?, nowMs: Long): String? {
-        val age = nowMs - (pickedAtMs ?: return null)
+     *  pick ([fallback]) if it was still on screen less than the grace window
+     *  ago ([lastSeenAtMs] = the pick, or leaving the app while it overrode
+     *  GPS), else none. */
+    fun overrideAfterStart(fallback: String?, lastSeenAtMs: Long?, nowMs: Long): String? {
+        val age = nowMs - (lastSeenAtMs ?: return null)
         return fallback.takeIf { age in 0 until MANUAL_GRACE_MS }
     }
 }

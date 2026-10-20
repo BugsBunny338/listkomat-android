@@ -228,9 +228,13 @@ fun ListkomatApp(viewModel: AppViewModel) {
                             ?.name(Locale.getDefault().language) },
                         onPick = { showingPicker = true },
                         onOpenSettings = {
-                            context.startActivity(Intent(
-                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.fromParts("package", context.packageName, null)))
+                            try {
+                                context.startActivity(Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.fromParts("package", context.packageName, null)))
+                            } catch (e: ActivityNotFoundException) {
+                                // A stripped-down ROM; the picker is right above.
+                            }
                         },
                     )
                 } else {
@@ -339,7 +343,7 @@ private fun EmptyState(
 ) {
     val far = (state as? LocationState.Located)
         ?.takeIf { it.distanceKm > NearestCity.MAX_DEFAULT_DISTANCE_KM }
-    val denied = far == null && state is LocationState.Denied
+    val denied = state is LocationState.Denied
     val title = when {
         far != null -> stringResource(R.string.empty_far)
         denied -> stringResource(R.string.empty_denied)
