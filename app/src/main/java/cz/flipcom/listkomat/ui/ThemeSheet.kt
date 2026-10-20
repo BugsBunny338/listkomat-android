@@ -24,6 +24,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -33,6 +34,7 @@ import cz.flipcom.listkomat.BuildConfig
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.AppearanceMode
+import cz.flipcom.listkomat.model.GlyphContrast
 
 /**
  * The appearance sheet, ported from the iOS ThemeSheet: light/system/dark
@@ -92,18 +94,19 @@ fun ThemeSheet(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     // Miniature of the bar: band colour with mascot / accent hint.
+                    val swatch = theme.band ?: MaterialTheme.colorScheme.surfaceVariant
                     Box(
                         Modifier
                             .size(width = 56.dp, height = 34.dp)
-                            .background(theme.band ?: MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(8.dp)),
+                            .background(swatch, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (theme.mascot != null) {
                             Text(theme.mascot, style = MaterialTheme.typography.titleMedium)
                         } else {
+                            // The accent as the app draws text with it (ui/Theme.kt).
                             Text("Aa", style = MaterialTheme.typography.labelMedium,
-                                color = theme.accent)
+                                color = remember(theme, swatch) { GlyphContrast.readableText(theme.accent, listOf(swatch)) })
                         }
                     }
                     Text(

@@ -1,12 +1,14 @@
 package cz.flipcom.listkomat.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.Font
@@ -95,23 +97,43 @@ fun ListkomatTheme(
         AppearanceMode.DARK -> true
         AppearanceMode.SYSTEM -> isSystemInDarkTheme()
     }
-    val base = if (dark) DarkColors else LightColors
-    val accent = theme.accent
-    // The clean/black looks keep the tuned teal scheme; a coloured band re-tints
-    // the accent roles so the whole app reads as one theme (iOS parity).
-    val scheme = if (accent == Brand.teal) base else base.copy(
-        primary = accent,
-        onPrimary = GlyphContrast.readableGlyph(accent),
-        primaryContainer = tintOver(base.surface, accent, 0.14f),
-        onPrimaryContainer = base.onSurface,
-        secondary = accent,
-    )
+    val scheme = remember(theme, dark) { themedColorScheme(theme, dark) }
     MaterialTheme(
         colorScheme = scheme,
         typography = BrandTypography,
         content = content,
     )
 }
+
+/**
+ * The colour scheme for [theme]. The clean/black looks start from the tuned
+ * teal scheme; a coloured band re-tints the accent roles so the whole app
+ * reads as one theme (iOS parity). Either way primary is then shaded until it
+ * reads as text (prices, links, headings) on every surface it is drawn on:
+ * the clean light teal darkens a little, most band colours a lot. The band in
+ * the top bar keeps the theme's own colour.
+ */
+internal fun themedColorScheme(theme: AppTheme, dark: Boolean): ColorScheme {
+    val base = if (dark) DarkColors else LightColors
+    val accent = theme.accent
+    val tinted = if (accent == Brand.teal) base else base.copy(
+        primary = accent,
+        primaryContainer = tintOver(base.surface, accent, 0.14f),
+        onPrimaryContainer = base.onSurface,
+        secondary = accent,
+    )
+    val textAccent = GlyphContrast.readableText(tinted.primary, accentTextSurfaces(tinted))
+    // Unchanged clean teal keeps its tuned onPrimary (ink in dark mode).
+    if (textAccent == base.primary) return tinted
+    return tinted.copy(primary = textAccent, onPrimary = GlyphContrast.readableGlyph(textAccent))
+}
+
+/** Where primary appears as text: page, cards, the notice tint, and the
+ *  sheet / menu / dialog containers (M3 defaults, not set in the schemes). */
+internal fun accentTextSurfaces(scheme: ColorScheme): List<Color> = listOf(
+    scheme.background, scheme.surfaceVariant, scheme.primaryContainer,
+    scheme.surfaceContainerLow, scheme.surfaceContainer, scheme.surfaceContainerHigh,
+)
 
 /**
  * Whether the app's surface is dark: the app's own appearance mode and theme,
