@@ -3,6 +3,7 @@
     <string name="app_name">Lístkomat</string>
     <string name="cities_title">Where are you?</string>
     <string name="price_format">%1$d CZK</string>
+    <string name="ticket_for">Ticket for %1$s</string>
     <string name="sms_sent_title">Did you send the SMS?</string>
     <string name="sms_sent_message">If you sent the ticket SMS, we\'ll start the validity countdown.</string>
     <string name="sms_sent_yes">Yes, sent</string>
@@ -48,6 +49,8 @@
     <string name="primer_continue">Continue</string>
     <string name="empty_searching">Finding the nearest city…</string>
     <string name="empty_denied">Location not allowed</string>
+    <string name="empty_denied_subtitle">Choose a city manually, or allow location access in Settings.</string>
+    <string name="open_settings">Open Settings</string>
     <string name="empty_far">No city nearby</string>
     <string name="empty_far_subtitle">The nearest supported city (%1$s) is ~%2$d km away. Pick a city manually.</string>
     <string name="footer_how">Tapping opens a prefilled SMS to %1$s. You buy the ticket by sending it.</string>

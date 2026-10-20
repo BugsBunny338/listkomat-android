@@ -3,6 +3,7 @@
     <string name="app_name">Lístkomat</string>
     <string name="cities_title">Kde jste?</string>
     <string name="price_format">%1$d Kč</string>
+    <string name="ticket_for">Lístek na %1$s</string>
     <string name="sms_sent_title">Odeslali jste SMS?</string>
     <string name="sms_sent_message">Pokud jste jízdenku odeslali, spustíme odpočet platnosti.</string>
     <string name="sms_sent_yes">Ano, odesláno</string>
@@ -52,6 +53,8 @@
     <string name="primer_continue">Pokračovat</string>
     <string name="empty_searching">Zjišťuji nejbližší město…</string>
     <string name="empty_denied">Poloha není povolená</string>
+    <string name="empty_denied_subtitle">Vyberte město ručně, nebo povolte polohu v Nastavení.</string>
+    <string name="open_settings">Otevřít nastavení</string>
     <string name="empty_far">Žádné město v okolí</string>
     <string name="empty_far_subtitle">Nejbližší podporované město (%1$s) je ~%2$d km daleko. Vyberte město ručně.</string>
     <string name="footer_how">Po klepnutí se otevře předvyplněná SMS na číslo %1$s. Lístek koupíte jejím odesláním.</string>

@@ -1,17 +1,25 @@
 package cz.flipcom.listkomat
 
+import android.Manifest
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import android.telephony.TelephonyManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import cz.flipcom.listkomat.data.ActiveTicketStore
 import cz.flipcom.listkomat.data.CatalogStore
 import cz.flipcom.listkomat.data.LocationService
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
+import cz.flipcom.listkomat.model.CitySelection
 import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.ForeignSimNotice
+import cz.flipcom.listkomat.model.LocationState
 import cz.flipcom.listkomat.model.NearestCity
 import cz.flipcom.listkomat.model.PendingTicket
 import cz.flipcom.listkomat.model.Purchase
@@ -20,8 +28,13 @@ import cz.flipcom.listkomat.model.Ticket
 import cz.flipcom.listkomat.model.TicketCatalog
 import cz.flipcom.listkomat.model.TicketTimeline
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -58,11 +71,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val statePrefs =
         app.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
 
-    /** Manual city selection, persisted. Null until the user picks one —
-     *  the GPS-nearest default the iOS app has is a future feature here. */
-    private val _selectedCityKey =
-        MutableStateFlow(statePrefs.getString("selected_city", null))
-    val selectedCityKey: StateFlow<String?> = _selectedCityKey
+    /** The last manual pick, persisted only as the fallback for when GPS
+     *  can't deliver ([CitySelection]). Builds before the rule persisted the
+     *  pick under the same key, so it carries over as the fallback. */
+    private val _fallbackCityKey = MutableStateFlow(statePrefs.getString(PICKED_CITY_KEY, null))
+    /** When the manual override was last on screen: the pick, then every
+     *  departure from the app while it still overrode GPS. Persisted, so a
+     *  process death while away doesn't shorten the grace. */
+    private var overrideSeenAtMs: Long? =
+        statePrefs.getLong(OVERRIDE_SEEN_AT_KEY, 0L).takeIf { statePrefs.contains(OVERRIDE_SEEN_AT_KEY) }
+
+    /** The same pick as a session override of GPS; set again from the
+     *  persisted one on a start within the grace window. */
+    private val _manualCityKey = MutableStateFlow<String?>(null)
 
     private val _themeId = MutableStateFlow(statePrefs.getString(THEME_KEY, "clean") ?: "clean")
     val themeId: StateFlow<String> = _themeId
@@ -82,29 +103,78 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectCity(key: String) {
-        statePrefs.edit().putString("selected_city", key).apply()
-        _selectedCityKey.value = key
-    }
-
-    /** GPS default, mirroring iOS: nearest supported city + distance, or a
-     *  denied/searching state. Manual selection always wins over this. */
-    sealed interface LocationState {
-        data object Idle : LocationState
-        data object Searching : LocationState
-        data object Denied : LocationState
-        data class Located(val cityKey: String, val distanceKm: Double) : LocationState
+        val now = System.currentTimeMillis()
+        statePrefs.edit().putString(PICKED_CITY_KEY, key).putLong(OVERRIDE_SEEN_AT_KEY, now).apply()
+        overrideSeenAtMs = now
+        _fallbackCityKey.value = key
+        _manualCityKey.value = key
     }
 
     private val _locationState = MutableStateFlow<LocationState>(LocationState.Idle)
     val locationState: StateFlow<LocationState> = _locationState
 
+    /** True while this process's first fix may still beat the fallback. */
+    private val _awaitingFirstFix = MutableStateFlow(false)
+
+    /** The city the home screen shows; null = an empty state explains why. */
+    val cityKey: StateFlow<String?> =
+        combine(_manualCityKey, _locationState, _fallbackCityKey, _awaitingFirstFix, CitySelection::cityKey)
+            .stateIn(viewModelScope, SharingStarted.Eagerly,
+                CitySelection.cityKey(_manualCityKey.value, _locationState.value, _fallbackCityKey.value))
+
     fun onLocationPermission(granted: Boolean) {
-        if (!granted) {
-            _locationState.value = LocationState.Denied
-            return
+        if (granted) locate() else _locationState.value = LocationState.Denied
+    }
+
+    /**
+     * Every return to the foreground: an old manual pick stops overriding GPS
+     * and, with permission, GPS runs again. Process-level, so a rotation (an
+     * activity restart) is not a return. Without permission nothing is asked
+     * here: the primer is for first runs with nothing to show.
+     */
+    private fun onAppStarted() {
+        _manualCityKey.value = CitySelection.overrideAfterStart(
+            _fallbackCityKey.value, overrideSeenAtMs, System.currentTimeMillis())
+        val granted = ContextCompat.checkSelfPermission(
+            getApplication(), Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) locate()
+    }
+
+    /** The grace counts from leaving, not from the pick: browsing for ten
+     *  minutes and then sending the ticket SMS must not flip the city. */
+    private fun onAppStopped() {
+        if (_manualCityKey.value == null) return
+        val now = System.currentTimeMillis()
+        statePrefs.edit().putLong(OVERRIDE_SEEN_AT_KEY, now).apply()
+        overrideSeenAtMs = now
+    }
+
+    private val processObserver = LifecycleEventObserver { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_START -> onAppStarted()
+            Lifecycle.Event.ON_STOP -> onAppStopped()
+            else -> {}
         }
-        _locationState.value = LocationState.Searching
-        viewModelScope.launch {
+    }
+
+    private var locating: Job? = null
+
+    private fun locate() {
+        if (locating?.isActive == true) return
+        // A fix from earlier in this process stays on screen while the new
+        // one comes in, rather than flashing the searching state. Without one,
+        // hold the fallback back briefly: the fix usually takes about a second,
+        // and a list that swaps cities under the thumb can sell the wrong ticket.
+        val hold = if (_locationState.value !is LocationState.Located) {
+            _locationState.value = LocationState.Searching
+            _awaitingFirstFix.value = true
+            viewModelScope.launch {
+                delay(CitySelection.FIRST_FIX_HOLD_MS)
+                _awaitingFirstFix.value = false
+            }
+        } else null
+        locating = viewModelScope.launch {
             val fix = runCatching { LocationService.coarseFix(getApplication()) }
                 .onFailure { if (it is CancellationException) throw it }
                 .getOrNull()
@@ -114,6 +184,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (nearest != null) {
                 _locationState.value = LocationState.Located(nearest.city.key, nearest.distanceKm)
             }
+            // After the fix lands, so the fallback never flashes in between.
+            hold?.cancel()
+            _awaitingFirstFix.value = false
         }
     }
 
@@ -144,6 +217,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _catalog.value = result.catalog
             _refreshFailed.value = result.failed
         }
+        // Last: adding the observer delivers ON_START right away when the app
+        // is already started, and onAppStarted needs everything above.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver)
     }
 
     /** Call right before starting the SMS activity; false = a hand-off is
@@ -151,7 +232,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun smsHandedOff(city: City, ticket: Ticket): Boolean =
         handoff.armed(PendingTicket(
             cityKey = city.key,
-            cityName = city.name,
+            // Localized like the notification, which resolves it again per render.
+            cityName = city.name(getApplication<Application>().resources.configuration.locales[0].language),
             ticketCode = ticket.code,
             durationMinutes = ticket.durationMinutes,
             priceKc = ticket.priceKc,
@@ -199,5 +281,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         /** Also read by TicketController for the notification's accent. */
         const val STATE_PREFS = "app_state"
         const val THEME_KEY = "theme_id"
+        private const val PICKED_CITY_KEY = "selected_city"
+        private const val OVERRIDE_SEEN_AT_KEY = "selected_city_at"
     }
 }

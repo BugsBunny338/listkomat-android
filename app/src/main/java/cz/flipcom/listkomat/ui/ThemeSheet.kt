@@ -26,10 +26,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import cz.flipcom.listkomat.BuildConfig
 import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.AppearanceMode
@@ -80,13 +80,7 @@ fun ThemeSheet(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
         )
-        val context = LocalContext.current
-        val version = remembered@ run {
-            runCatching {
-                val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-                "Lístkomat ${pi.versionName}"
-            }.getOrDefault("Lístkomat")
-        }
+        val version = "Lístkomat ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         LazyColumn {
             items(AppTheme.presets, key = { it.id }) { theme ->
                 Row(
