@@ -30,8 +30,9 @@ import java.util.Date
 /**
  * The in-app countdown for the one active ticket: pending ("waiting for
  * confirmation" + Confirm now) until validFrom, then time-left until endMs,
- * then an expired state. Android counterpart of the iOS banner + Live Activity
- * (a proper ongoing notification is a parity-phase item).
+ * then an expired state. Together with the ongoing notification
+ * (notify/TicketOngoing.kt), the Android counterpart of the iOS banner + Live
+ * Activity. This banner is the source of truth; the notification mirrors it.
  */
 @Composable
 fun ActiveTicketBanner(

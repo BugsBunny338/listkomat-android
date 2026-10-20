@@ -115,7 +115,11 @@ fun ListkomatApp(viewModel: AppViewModel) {
     }
 
     val notifPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()) { /* result irrelevant */ }
+        ActivityResultContracts.RequestPermission()) { granted ->
+        // The ongoing notification was posted (and dropped) before the
+        // permission existed; post it again now that it does.
+        if (granted) viewModel.refreshOngoing()
+    }
     val confirmPurchase = {
         viewModel.purchaseConfirmed()
         if (Build.VERSION.SDK_INT >= 33) {
@@ -131,7 +135,10 @@ fun ListkomatApp(viewModel: AppViewModel) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> viewModel.handOffLeft()
-                Lifecycle.Event.ON_RESUME -> viewModel.handOffReturned()
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.handOffReturned()
+                    viewModel.refreshOngoing()
+                }
                 else -> {}
             }
         }

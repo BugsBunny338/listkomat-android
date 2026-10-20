@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Put the ticket's alarms and ongoing notification back after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- API 36: lets the ongoing ticket notification become a Live Update. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!-- MapLibre's library manifest asks for these for its location component,
          which the app doesn't use. Location stays coarse-only (no "precise
@@ -39,5 +43,16 @@
         <receiver
             android:name=".notify.TicketNotifications$ExpiryReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".notify.TicketActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notify.TicketBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

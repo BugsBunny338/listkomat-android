@@ -1,5 +1,6 @@
 package cz.flipcom.listkomat
 
+import cz.flipcom.listkomat.model.TicketPhase
 import cz.flipcom.listkomat.model.TicketTimeline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,5 +36,23 @@ class TicketTimelineTest {
         assertEquals(now, c.validFromMs)
         assertEquals(t.durationMs, c.durationMs)
         assertFalse(c.isPending(now))
+    }
+
+    @Test
+    fun `phase is pending, then valid from validFrom, then expired from endMs`() {
+        val t = TicketTimeline.make(sentAtMs = 0, durationMinutes = 30)
+        assertEquals(TicketPhase.PENDING, t.phase(t.sentAtMs))
+        assertEquals(TicketPhase.PENDING, t.phase(t.validFromMs - 1))
+        assertEquals(TicketPhase.VALID, t.phase(t.validFromMs))
+        assertEquals(TicketPhase.VALID, t.phase(t.endMs - 1))
+        assertEquals(TicketPhase.EXPIRED, t.phase(t.endMs))
+    }
+
+    @Test
+    fun `confirm now flips the phase to valid immediately`() {
+        val t = TicketTimeline.make(sentAtMs = 0, durationMinutes = 30)
+        val now = 30_000L
+        assertEquals(TicketPhase.PENDING, t.phase(now))
+        assertEquals(TicketPhase.VALID, t.confirmed(now).phase(now))
     }
 }

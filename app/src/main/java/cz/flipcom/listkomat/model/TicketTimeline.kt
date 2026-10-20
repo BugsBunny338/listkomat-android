@@ -22,6 +22,13 @@ data class TicketTimeline(
 
     fun isExpired(nowMs: Long): Boolean = nowMs >= endMs
 
+    /** Which of the three states the ticket is in at [nowMs]. */
+    fun phase(nowMs: Long): TicketPhase = when {
+        isExpired(nowMs) -> TicketPhase.EXPIRED
+        isPending(nowMs) -> TicketPhase.PENDING
+        else -> TicketPhase.VALID
+    }
+
     /** Re-anchor to now (confirmation arrived), keeping the same duration. */
     fun confirmed(nowMs: Long): TicketTimeline =
         TicketTimeline(sentAtMs = sentAtMs, validFromMs = nowMs, endMs = nowMs + durationMs)
@@ -40,3 +47,6 @@ data class TicketTimeline(
         }
     }
 }
+
+/** Pending (awaiting the confirmation SMS) → valid → expired. */
+enum class TicketPhase { PENDING, VALID, EXPIRED }

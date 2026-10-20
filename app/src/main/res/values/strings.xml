@@ -17,6 +17,8 @@
     <string name="notification_channel_ticket">Jízdenka</string>
     <string name="notification_expired_title">Jízdenka vypršela</string>
     <string name="notification_expired_body">Platnost jízdenky skončila.</string>
+    <string name="notification_channel_ongoing">Aktivní jízdenka</string>
+    <string name="ongoing_pending_title">Čeká na potvrzovací SMS</string>
     <plurals name="duration_minutes">
         <item quantity="one">%d minutu</item>
         <item quantity="few">%d minuty</item>
