@@ -26,6 +26,18 @@ object CitySelection {
     const val MANUAL_GRACE_MS = 5 * 60 * 1000L
     const val FIRST_FIX_HOLD_MS = 2_000L
 
+    /**
+     * A last-known fix this recent counts as GPS delivering. The app holds
+     * only coarse permission, and Android serves coarse clients at most one
+     * update per 10 minutes, so a "current" request almost never answers
+     * (measured on the A14 2026-10-20: none in 15 s on 9 of 10 cold starts,
+     * while the last-known fix was 1-6 min old). Moving to another city
+     * takes longer than this.
+     */
+    const val LAST_KNOWN_MAX_AGE_MS = 15 * 60 * 1000L
+
+    fun lastKnownIsFresh(ageMs: Long): Boolean = ageMs in 0..LAST_KNOWN_MAX_AGE_MS
+
     fun cityKey(
         manual: String?,
         location: LocationState,

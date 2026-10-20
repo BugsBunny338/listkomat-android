@@ -9,7 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.RequiresApi
+import cz.flipcom.listkomat.model.CitySelection
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -19,10 +22,12 @@ import kotlin.coroutines.resume
 
 /**
  * One coarse fix for the nearest-city default; city-level accuracy is all
- * that's needed. Every enabled provider is asked in parallel and the first
- * answer wins — on real devices the network provider is quick, on the
- * emulator only GPS (fed by `geo fix`) ever responds. Falls back to the
- * freshest last-known fix. Caller must hold ACCESS_COARSE_LOCATION.
+ * that's needed. A recent last-known fix answers at once. Otherwise every
+ * enabled provider is asked in parallel and the first answer wins; for a
+ * coarse-only app that rarely happens within the timeout, since Android
+ * throttles coarse clients (on the emulator, GPS fed by `geo fix` answers).
+ * Falls back to the freshest last-known fix, however old. Caller must hold
+ * ACCESS_COARSE_LOCATION.
  */
 object LocationService {
 
@@ -39,6 +44,15 @@ object LocationService {
         // skips it where the OS says so, the catch below guards the rest.
         val usable = lm.getProviders(true)
         val providers = wanted.filter { it in usable }
+        // Coarse clients rarely get a current fix (see CitySelection), so a
+        // recent last-known one answers at once instead of after the timeout.
+        val recent = lastKnown(lm)
+        val recentAge = recent?.let(::ageMs)
+        if (recent != null && recentAge != null && CitySelection.lastKnownIsFresh(recentAge)) {
+            Log.d(LOG_TAG, "location: last known ${describe(recent)}, used at once")
+            return recent
+        }
+        val startedNs = SystemClock.elapsedRealtimeNanos()
         val current = withTimeoutOrNull(15_000) {
             if (providers.isEmpty()) return@withTimeoutOrNull null
             coroutineScope {
@@ -60,8 +74,21 @@ object LocationService {
                 first
             }
         }
-        return current ?: lastKnown(lm)
+        val last = lastKnown(lm)
+        Log.d(LOG_TAG, "location: current fix ${current?.let { "${it.provider} after ${msSince(startedNs)} ms" } ?: "none in 15 s"}, " +
+            "last known ${last?.let(::describe) ?: "none"}")
+        return current ?: last
     }
+
+    private fun msSince(ns: Long) = (SystemClock.elapsedRealtimeNanos() - ns) / 1_000_000
+
+    /** Null when the provider left the monotonic timestamp out: age unknown,
+     *  so never fresh. */
+    private fun ageMs(location: Location): Long? =
+        location.elapsedRealtimeNanos.takeIf { it > 0 }?.let(::msSince)
+
+    private fun describe(location: Location) =
+        "${location.provider} ${ageMs(location)?.let { "${it / 1000} s old" } ?: "of unknown age"}"
 
     private suspend fun currentFrom(lm: LocationManager, provider: String, context: Context): Location? =
         if (Build.VERSION.SDK_INT >= 30) currentFromApi30(lm, provider, context)
@@ -105,5 +132,7 @@ object LocationService {
     @SuppressLint("MissingPermission")
     private fun lastKnown(lm: LocationManager): Location? =
         lm.allProviders.mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
-            .maxByOrNull { it.time }
+            // The monotonic clock, like the age check: wall time jumps with
+            // clock changes and could rank an older fix first.
+            .maxByOrNull { it.elapsedRealtimeNanos }
 }
