@@ -33,10 +33,10 @@
         <item quantity="many">%d hodiny</item>
         <item quantity="other">%d hodin</item>
     </plurals>
-    <string name="sim_notice_title">Potřebujete českou SIM</string>
-    <string name="sim_notice_body">Prémiové SMS umí zpracovat jen čeští operátoři. Ze zahraniční SIM se zpráva obvykle tváří, že odešla, ale lístek nedorazí.</string>
-    <string name="sim_notice_more">Více</string>
-    <string name="sim_notice_dismiss">Rozumím</string>
+    <string name="sim_notice_title">Nákup vyžaduje SIM kartu českého operátora</string>
+    <string name="sim_notice_body">Lístky se kupují prémiovou SMS. Ze zahraniční SIM v roamingu nedorazí.</string>
+    <string name="sim_notice_more">Více informací</string>
+    <string name="sim_notice_close">Zavřít upozornění</string>
     <string name="sim_footer_link">Jak funguje placení SMS?</string>
     <string name="sim_sheet_title">Placení SMS</string>
     <string name="sim_sheet_how_title">Jak nákup funguje</string>
