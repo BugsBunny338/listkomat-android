@@ -15,6 +15,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.SmsFailed
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,30 +92,10 @@ fun TicketListScreen(
 
         if (showSimNotice) {
             item(key = "sim-notice") {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer),
-                ) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(stringResource(R.string.sim_notice_title),
-                            style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.sim_notice_body),
-                            style = MaterialTheme.typography.bodySmall)
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            TextButton(onClick = { showingSheet = true }) {
-                                Text(stringResource(R.string.sim_notice_more))
-                            }
-                            TextButton(onClick = onDismissSimNotice) {
-                                Text(stringResource(R.string.sim_notice_dismiss))
-                            }
-                        }
-                    }
-                }
+                ForeignSimNotice(
+                    onMore = { showingSheet = true },
+                    onDismiss = onDismissSimNotice,
+                )
             }
         }
         items(city.tickets, key = { it.code }) { ticket ->
@@ -172,6 +158,64 @@ fun TicketListScreen(
 
     if (showingSheet) {
         SimRequirementSheet(onDismiss = { showingSheet = false })
+    }
+}
+
+/**
+ * One-time, dismissible note for users the heuristic flags as probably
+ * foreign. Same copy and warning look as iOS (orange tint and icon, X to
+ * dismiss); the Material card shape stays, iOS keeps its edge-to-edge strip.
+ */
+@Composable
+private fun ForeignSimNotice(onMore: () -> Unit, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val colors = remember(scheme) { simNoticeColors(scheme) }
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = colors.container,
+            contentColor = scheme.onSurface,
+        ),
+    ) {
+        Row(Modifier.padding(start = 16.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)) {
+            Icon(
+                Icons.Outlined.SmsFailed,
+                contentDescription = null,
+                tint = colors.content,
+                modifier = Modifier.padding(top = 10.dp).size(20.dp),
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp, top = 8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.sim_notice_title),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = AlteHaas, fontWeight = FontWeight.Bold),
+                )
+                Text(
+                    stringResource(R.string.sim_notice_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                // Left-aligned under the body like iOS: shifted by the button's
+                // own start padding so its label lines up with the text.
+                TextButton(onClick = onMore, modifier = Modifier.offset(x = (-12).dp)) {
+                    Text(stringResource(R.string.sim_notice_more))
+                }
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.sim_notice_close),
+                    tint = scheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
     }
 }
 

@@ -29,10 +29,10 @@
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
     </plurals>
-    <string name="sim_notice_title">You need a Czech SIM</string>
-    <string name="sim_notice_body">Premium SMS only works with Czech operators. From a foreign SIM the message usually seems to send, but the ticket never arrives.</string>
+    <string name="sim_notice_title">Buying requires a Czech operator\'s SIM</string>
+    <string name="sim_notice_body">Tickets are bought by premium SMS. They never arrive on a foreign SIM in roaming.</string>
     <string name="sim_notice_more">Learn more</string>
-    <string name="sim_notice_dismiss">Got it</string>
+    <string name="sim_notice_close">Dismiss notice</string>
     <string name="sim_footer_link">How does SMS payment work?</string>
     <string name="sim_sheet_title">SMS payment</string>
     <string name="sim_sheet_how_title">How buying works</string>

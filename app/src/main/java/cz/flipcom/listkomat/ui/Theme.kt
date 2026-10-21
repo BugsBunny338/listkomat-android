@@ -128,12 +128,35 @@ internal fun themedColorScheme(theme: AppTheme, dark: Boolean): ColorScheme {
     return tinted.copy(primary = textAccent, onPrimary = GlyphContrast.readableGlyph(textAccent))
 }
 
-/** Where primary appears as text: page, cards, the notice tint, and the
- *  sheet / menu / dialog containers (M3 defaults, not set in the schemes). */
+/** Where primary appears as text: page, cards, the ticket banner, the
+ *  foreign-SIM notice ("Learn more"), and the sheet / menu / dialog
+ *  containers (M3 defaults, not set in the schemes). */
 internal fun accentTextSurfaces(scheme: ColorScheme): List<Color> = listOf(
     scheme.background, scheme.surfaceVariant, scheme.primaryContainer,
+    simNoticeColors(scheme).container,
     scheme.surfaceContainerLow, scheme.surfaceContainer, scheme.surfaceContainerHigh,
 )
+
+/** iOS's `.orange` (systemOrange, light / dark): the warning colour, never the theme's. */
+object Warning {
+    val orange = Color(0xFFFF9500)
+    val orangeDark = Color(0xFFFF9F0A)
+}
+
+internal data class NoticeColors(val container: Color, val content: Color)
+
+/**
+ * The foreign-SIM notice is a warning, so it is orange on every theme (iOS
+ * parity): orange at 12 % over the page, and the orange as the icon colour,
+ * shaded like the theme accent until it reads at text contrast on that tint.
+ * Light mode darkens it to a deep orange; dark mode's orange already reads.
+ */
+internal fun simNoticeColors(scheme: ColorScheme): NoticeColors {
+    val dark = scheme.background.luminance() < 0.5f
+    val orange = if (dark) Warning.orangeDark else Warning.orange
+    val container = tintOver(scheme.background, orange, 0.12f)
+    return NoticeColors(container, GlyphContrast.readableText(orange, listOf(container)))
+}
 
 /**
  * Whether the app's surface is dark: the app's own appearance mode and theme,
