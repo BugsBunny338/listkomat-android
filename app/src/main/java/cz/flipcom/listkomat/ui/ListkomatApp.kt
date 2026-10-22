@@ -56,7 +56,6 @@ import cz.flipcom.listkomat.R
 import cz.flipcom.listkomat.data.SmsPurchase
 import cz.flipcom.listkomat.model.AppTheme
 import cz.flipcom.listkomat.model.AppearanceMode
-import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.LocationState
 import cz.flipcom.listkomat.model.NearestCity
 import cz.flipcom.listkomat.model.Purchase

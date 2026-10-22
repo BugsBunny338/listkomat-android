@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cz.flipcom.listkomat.R
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.DurationFormat
@@ -150,8 +151,8 @@ fun TicketListScreen(
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                val date = formatCatalogDate(updatedAt,
-                    LocalContext.current.resources.configuration.locales[0])
+                val locale = LocalConfiguration.current.locales[0]
+                val date = remember(updatedAt, locale) { formatCatalogDate(updatedAt, locale) }
                 Text(
                     if (staleHint) stringResource(R.string.footer_offline, date)
                     else stringResource(R.string.footer_prices_as_of, date),
