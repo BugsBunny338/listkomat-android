@@ -1,1 +1,1 @@
-Jízdenka teď žije i v oznámeních: odpočet, platnost a tlačítko Ukončit, i když je aplikace zavřená. Město se vybírá podle polohy. Lepší čitelnost barev ve všech motivech.
+Upozornění na zahraniční SIM má nový vzhled, stejný jako na iPhonu. Jízdenka a datum ceníku se teď řídí zvoleným jazykem aplikace.
