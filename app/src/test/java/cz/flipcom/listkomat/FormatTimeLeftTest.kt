@@ -15,9 +15,13 @@ class FormatTimeLeftTest {
 }
 
 class CatalogDateFormatTest {
+    // The locale formatting itself is android.icu (device only): checked on the
+    // A14 in cs and en. Here: what reaches it, and what is shown verbatim.
     @Test
-    fun `iso date renders czech-style, garbage passes through`() {
-        org.junit.Assert.assertEquals("30. 8. 2026", cz.flipcom.listkomat.ui.formatCatalogDate("2026-08-30"))
-        org.junit.Assert.assertEquals("nonsense", cz.flipcom.listkomat.ui.formatCatalogDate("nonsense"))
+    fun `iso date parses, anything else passes through verbatim`() {
+        assertEquals(java.time.LocalDate.of(2026, 8, 30), cz.flipcom.listkomat.ui.parseCatalogDate("2026-08-30"))
+        assertEquals(null, cz.flipcom.listkomat.ui.parseCatalogDate("srpen 2026"))
+        assertEquals(null, cz.flipcom.listkomat.ui.parseCatalogDate("2026-8-30"))
+        assertEquals("srpen 2026", cz.flipcom.listkomat.ui.formatCatalogDate("srpen 2026", java.util.Locale("cs")))
     }
 }

@@ -17,7 +17,6 @@ import cz.flipcom.listkomat.data.LocationService
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.City
 import cz.flipcom.listkomat.model.CitySelection
-import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.ForeignSimNotice
 import cz.flipcom.listkomat.model.LocationState
 import cz.flipcom.listkomat.model.NearestCity
@@ -254,7 +253,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ticket = ActiveTicket(
             cityKey = pending.cityKey,
             cityName = pending.cityName,
-            ticketLabel = DurationFormat.format(getApplication(), pending.durationMinutes),
             priceKc = pending.priceKc,
             timeline = TicketTimeline.make(
                 sentAtMs = asked.sentAtMs,

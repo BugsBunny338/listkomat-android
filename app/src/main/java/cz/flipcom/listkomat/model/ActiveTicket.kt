@@ -1,5 +1,6 @@
 package cz.flipcom.listkomat.model
 
+import android.content.Context
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,10 +15,22 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ActiveTicket(
     val cityKey: String,
+    /** Localized at purchase; only the fallback for a city the catalog no longer has. */
     val cityName: String,
-    val ticketLabel: String,     // e.g. "90 min"
     val priceKc: Int,
     val timeline: TicketTimeline,
     /** The user swiped the ongoing notification away; don't repost it. */
     val ongoingDismissed: Boolean = false,
 )
+
+/**
+ * "Praha · 30 minut" in the current app language. Resolved on every render,
+ * never stored: a label formatted at purchase stays in the old language after a
+ * runtime language switch (android#31).
+ */
+fun ActiveTicket.title(context: Context, catalog: TicketCatalog): String {
+    val language = context.resources.configuration.locales[0].language
+    val city = catalog.cities.firstOrNull { it.key == cityKey }?.name(language) ?: cityName
+    val minutes = (timeline.durationMs / 60_000).toInt()
+    return "$city · ${DurationFormat.format(context, minutes)}"
+}
