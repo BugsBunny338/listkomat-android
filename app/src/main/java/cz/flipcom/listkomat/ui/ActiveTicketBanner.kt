@@ -38,6 +38,7 @@ import java.util.Date
 @Composable
 fun ActiveTicketBanner(
     ticket: ActiveTicket,
+    title: String,
     onConfirmNow: () -> Unit,
     onEnd: () -> Unit,
 ) {
@@ -66,7 +67,7 @@ fun ActiveTicketBanner(
         ) {
             Column {
                 Text(
-                    "${ticket.cityName} · ${ticket.ticketLabel}",
+                    title,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 when {

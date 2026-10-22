@@ -61,8 +61,7 @@ object TicketOngoing {
     fun post(
         context: Context,
         ticket: ActiveTicket,
-        cityName: String,
-        ticketLabel: String,
+        title: String,
         accent: Int,
         nowMs: Long,
     ) {
@@ -72,7 +71,6 @@ object TicketOngoing {
         ensureChannel(context)
 
         val pending = phase == TicketPhase.PENDING
-        val label = "$cityName · $ticketLabel"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(accent)
@@ -95,13 +93,13 @@ object TicketOngoing {
             val from = timeFormat.format(Date(timeline.validFromMs))
             builder
                 .setContentTitle(context.getString(R.string.ongoing_pending_title))
-                .setContentText(context.getString(R.string.ongoing_pending_text, label, from))
+                .setContentText(context.getString(R.string.ongoing_pending_text, title, from))
                 .addAction(0, context.getString(R.string.confirm_now),
                     action(context, TicketIntents.CONFIRM_NOW, CONFIRM_REQUEST_CODE))
         } else {
             val until = timeFormat.format(Date(timeline.endMs))
             builder
-                .setContentTitle(label)
+                .setContentTitle(title)
                 .setContentText(context.getString(R.string.ticket_valid_until, until))
         }
         builder.addAction(0, context.getString(R.string.end_ticket),

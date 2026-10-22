@@ -60,6 +60,7 @@ import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.LocationState
 import cz.flipcom.listkomat.model.NearestCity
 import cz.flipcom.listkomat.model.Purchase
+import cz.flipcom.listkomat.model.title
 import java.util.Locale
 
 /**
@@ -219,6 +220,7 @@ fun ListkomatApp(viewModel: AppViewModel) {
                 activeTicket?.let { active ->
                     ActiveTicketBanner(
                         ticket = active,
+                        title = active.title(context, catalog),
                         onConfirmNow = viewModel::confirmNow,
                         onEnd = viewModel::endTicket,
                     )

@@ -7,8 +7,8 @@ import cz.flipcom.listkomat.data.ActiveTicketStore
 import cz.flipcom.listkomat.data.CatalogStore
 import cz.flipcom.listkomat.model.ActiveTicket
 import cz.flipcom.listkomat.model.AppTheme
-import cz.flipcom.listkomat.model.DurationFormat
 import cz.flipcom.listkomat.model.TicketCatalog
+import cz.flipcom.listkomat.model.title
 import cz.flipcom.listkomat.notify.TicketActions
 import cz.flipcom.listkomat.notify.TicketNotifications
 import cz.flipcom.listkomat.notify.TicketOngoing
@@ -119,18 +119,11 @@ class TicketController private constructor(private val context: Context) : Ticke
 
     private fun showOngoing(ticket: ActiveTicket) {
         if (ticket.ongoingDismissed) return
-        val language = context.resources.configuration.locales[0].language
-        // The ticket stores the Czech name and the label from purchase time.
-        // Resolve both again so they follow the current app language.
-        val cityName = catalog.cities.firstOrNull { it.key == ticket.cityKey }
-            ?.name(language) ?: ticket.cityName
-        val minutes = (ticket.timeline.durationMs / 60_000).toInt()
         val themeId = context.getSharedPreferences(AppViewModel.STATE_PREFS, Context.MODE_PRIVATE)
             .getString(AppViewModel.THEME_KEY, null)
         TicketOngoing.post(
             context, ticket,
-            cityName = cityName,
-            ticketLabel = DurationFormat.format(context, minutes),
+            title = ticket.title(context, catalog),
             accent = AppTheme.resolve(themeId).accent.toArgb(),
             nowMs = now(),
         )

@@ -38,6 +38,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.size
 import cz.flipcom.listkomat.model.Ticket
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeParseException
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -146,9 +150,11 @@ fun TicketListScreen(
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
+                val date = formatCatalogDate(updatedAt,
+                    LocalContext.current.resources.configuration.locales[0])
                 Text(
-                    if (staleHint) stringResource(R.string.footer_offline, formatCatalogDate(updatedAt))
-                    else stringResource(R.string.footer_prices_as_of, formatCatalogDate(updatedAt)),
+                    if (staleHint) stringResource(R.string.footer_offline, date)
+                    else stringResource(R.string.footer_prices_as_of, date),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (staleHint) MaterialTheme.colorScheme.error else secondary,
                 )
@@ -219,12 +225,20 @@ private fun ForeignSimNotice(onMore: () -> Unit, onDismiss: () -> Unit) {
     }
 }
 
-/** "2026-08-30" -> "30. 8. 2026", tolerant of anything else (shown verbatim). */
-internal fun formatCatalogDate(updatedAt: String): String {
-    val p = updatedAt.split("-")
-    if (p.size != 3) return updatedAt
-    val (y, m, d) = p
-    val di = d.toIntOrNull() ?: return updatedAt
-    val mi = m.toIntOrNull() ?: return updatedAt
-    return "$di. $mi. $y"
+/**
+ * The catalog's `updatedAt` ("2026-08-30") as a numeric date in [locale]:
+ * "30. 8. 2026" in Czech, "8/30/2026" in US English (android#32, as iOS G6).
+ * A `yMd` skeleton, because the SHORT style has a 2-digit year in some locales.
+ * Anything that isn't a plain `yyyy-MM-dd` is shown verbatim. Formatted in UTC,
+ * so the day never shifts with the device's time zone.
+ */
+internal fun formatCatalogDate(updatedAt: String, locale: Locale): String {
+    val date = parseCatalogDate(updatedAt) ?: return updatedAt
+    val format = android.icu.text.DateFormat.getInstanceForSkeleton("yMd", locale)
+    format.timeZone = android.icu.util.TimeZone.GMT_ZONE
+    return format.format(Date(date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()))
 }
+
+/** "2026-08-30" -> that date, anything else -> null. */
+internal fun parseCatalogDate(updatedAt: String): LocalDate? =
+    try { LocalDate.parse(updatedAt) } catch (e: DateTimeParseException) { null }
