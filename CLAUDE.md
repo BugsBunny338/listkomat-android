@@ -6,7 +6,7 @@ decisions (SMS handoff, catalog-driven, confirmation-anchored validity) are in
 [README.md](README.md); this file is the working context that isn't obvious
 from the code.
 
-**Start sessions from the apps hub** (`~/prj/mobile-apps`), never from inside this
+**Start sessions from the apps hub** (`~/prj/mobile-apps-hub`), never from inside this
 repo. The [hub CLAUDE.md](../CLAUDE.md) carries the cross-app rules,
 [`../docs/listkomat.md`](../docs/listkomat.md) the Lístkomat family rules and
 [`../docs/play-console.md`](../docs/play-console.md) the Play lessons;
