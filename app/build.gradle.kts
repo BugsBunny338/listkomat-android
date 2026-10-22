@@ -15,7 +15,7 @@ android {
         applicationId = "cz.flipcom.listkomat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
+        versionCode = 7
         versionName = "0.1"
     }
 
