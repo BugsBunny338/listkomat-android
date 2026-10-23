@@ -71,15 +71,18 @@ Details and the manual console steps are in [docs/play-launch.md](docs/play-laun
    as is `res/drawable/ic_launcher_foreground.xml` (the feature graphic since
    listkomat-ios#38). Never hand-edit them.
 
-Play writes and merges are Jiri's (and classifier-gated in auto mode). Closed
+Play writes are Jiri's (and classifier-gated in auto mode). Merges are not:
+see the hub `CLAUDE.md` → Git flow. Closed
 track "Alpha" needs ~12 opted-in testers for 14 days before production.
 
 ## Rules learned the hard way
 
-- **No stacked PRs.** Squash-merging the base PR with `--delete-branch` closed
-  the stacked one instead of retargeting it. Branch every PR off `main`.
-- **PR open → code-reviewed → stop.** Paste the review summary (findings,
-  what was fixed or why not) into the PR description. Jiri merges.
+- **No PRs (since 2026-10-23).** Work in a worktree branch off `main`, get an
+  agent code review and fix its findings, then rebase onto `origin/main`,
+  fast-forward `main` and push. The review summary (findings, what was fixed
+  or why not) goes in the commit message. The full rule is in the hub
+  `CLAUDE.md` → Git flow. (Older lesson: stacked PRs broke when the base PR
+  was squash-merged with `--delete-branch`.)
 - **OkHttp: read response bodies inside try/catch.** An `IOException` thrown
   in `onResponse` is only logged; `onFailure` never fires, so the caller hangs.
 - **Network-touching cleanup (`connectionPool.evictAll()`) runs on IO, never
