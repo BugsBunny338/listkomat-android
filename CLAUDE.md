@@ -53,7 +53,8 @@ Logs: `adb logcat -s Listkomat`.
 Details and the manual console steps are in [docs/play-launch.md](docs/play-launch.md).
 
 1. Bump `versionCode` in `app/build.gradle.kts` in its **own PR** (never inside
-   a fix PR). `versionName` stays pre-1.0 until decided otherwise.
+   a fix PR). `versionName` was 0.1 for the closed test; 1.0 from the first
+   production build (vc=8).
 2. `./gradlew bundleRelease` **from the main checkout**. The signing files
    (`keystore.properties`, `upload-keystore.jks`, both gitignored and backed up
    in Bitwarden) exist only there. A worktree without them produces an
