@@ -121,9 +121,14 @@ class TicketController private constructor(private val context: Context) : Ticke
         if (ticket.ongoingDismissed) return
         val themeId = context.getSharedPreferences(AppViewModel.STATE_PREFS, Context.MODE_PRIVATE)
             .getString(AppViewModel.THEME_KEY, null)
+        // The application context's resources are updated in place on a
+        // runtime language switch, and on a Play (split) install their plural
+        // cache keeps the old language: "Prague · 30 minut" (android#36).
+        // A fresh configuration context starts with an empty cache.
+        val localized = context.createConfigurationContext(context.resources.configuration)
         TicketOngoing.post(
-            context, ticket,
-            title = ticket.title(context, catalog),
+            localized, ticket,
+            title = ticket.title(localized, catalog),
             accent = AppTheme.resolve(themeId).accent.toArgb(),
             nowMs = now(),
         )
