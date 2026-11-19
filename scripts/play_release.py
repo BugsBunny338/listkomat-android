@@ -17,6 +17,9 @@ Usage:
         # moves the newest release across tracks; notes are the DESTINATION
         # track's (play/release-notes/<to>.txt + <to>.en-US.txt), never carried
         # over from <from>
+  play_release.py screenshots <lang> [--dry-run]
+        # replaces the <lang> listing's phone screenshots with
+        # play/screenshots/<lang>/*.png in file-name order (2-8 images)
   play_release.py listing <lang> [--dry-run]
         # uploads play/listing/<lang>/{title,short_description,full_description}.txt
         # as the store listing for <lang> (e.g. cs-CZ, en-US); diffs against the
@@ -190,6 +193,39 @@ def cmd_listing(lang, dry_run=False):
             call(tok, "DELETE", f"{BASE}/edits/{eid}")
 
 
+SHOTS_DIR = os.path.join(os.path.dirname(__file__), os.pardir, "play", "screenshots")
+
+
+def cmd_screenshots(lang, dry_run=False):
+    """Replaces the <lang> listing's phone screenshots with
+    play/screenshots/<lang>/*.png, in file-name order (Play allows 2-8)."""
+    d = os.path.join(SHOTS_DIR, lang)
+    files = sorted(f for f in os.listdir(d) if f.endswith(".png"))
+    if not 2 <= len(files) <= 8:
+        sys.exit(f"ERROR: {len(files)} screenshots in {d}; Play wants 2-8")
+    tok = token()
+    eid = call(tok, "POST", f"{BASE}/edits", b"{}")["id"]
+    try:
+        live = call(tok, "GET", f"{BASE}/edits/{eid}/listings/{lang}/phoneScreenshots",
+                    allow_404=True) or {}
+        print(f"live {lang}: {len(live.get('images', []))} phone screenshots; "
+              f"local: {len(files)} ({', '.join(files)})")
+        if dry_run:
+            print("DRY RUN: nothing uploaded")
+            return
+        call(tok, "DELETE", f"{BASE}/edits/{eid}/listings/{lang}/phoneScreenshots")
+        for f in files:
+            call(tok, "POST",
+                 f"{UPLOAD_BASE}/edits/{eid}/listings/{lang}/phoneScreenshots?uploadType=media",
+                 open(os.path.join(d, f), "rb").read(), content_type="image/png")
+            print(f"   uploaded {f}")
+        call(tok, "POST", f"{BASE}/edits/{eid}:commit")
+        eid = None
+        print(f"DONE: {lang} phone screenshots replaced ({len(files)})")
+    finally:
+        if eid:
+            call(tok, "DELETE", f"{BASE}/edits/{eid}")
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args or args[0] == "status":
@@ -204,5 +240,7 @@ if __name__ == "__main__":
         cmd_promote(args[1], args[2], nf)
     elif args[0] == "listing":
         cmd_listing(args[1], "--dry-run" in args)
+    elif args[0] == "screenshots":
+        cmd_screenshots(args[1], "--dry-run" in args)
     else:
         sys.exit(__doc__)

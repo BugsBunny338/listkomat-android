@@ -35,7 +35,7 @@ agent can automate once the account exists.
 service account key at `~/.config/listkomat-play/service-account.json`
 (local-only secret; per-app permissions: testing + production releases,
 tester lists, store presence). Commands: `status`, `release <track>`,
-`promote <from> <to>`, `listing <lang> [--dry-run]`. Release notes come from `play/release-notes/<track>.txt` (cs-CZ) and `<track>.en-US.txt` (en-US, sent when present; 500 chars max each)
+`promote <from> <to>`, `listing <lang> [--dry-run]`, `screenshots <lang> [--dry-run]`. Release notes come from `play/release-notes/<track>.txt` (cs-CZ) and `<track>.en-US.txt` (en-US, sent when present; 500 chars max each)
 — edit the files, never the console UI (house rule, same as iOS fastlane
 metadata).
 
@@ -58,3 +58,27 @@ metadata).
   so no SMS/Call-Log policy declaration is needed.
 - Location: coarse, foreground-only, with an in-app primer; no background use.
 - No exact alarms (`setAndAllowWhileIdle` only) — no policy exposure there.
+
+## Store screenshots (recipe, 2026-11-19)
+
+Taken on the `listkomat` AVD (Pixel 7, 1080×2400) with a signed
+`assembleRelease` APK, saved to `play/screenshots/<lang>/NN-name.png`, uploaded
+with `play_release.py screenshots <lang>`. Play accepted 1080×2400.
+
+- `adb root`, then the system language: `setprop persist.sys.locale cs-CZ`
+  (or en-US) + `settings put system system_locales …` + `setprop ctl.restart
+  zygote` (killing systemui alone leaves the shade in the old language). Set the
+  app language after the restart: `cmd locale set-app-locales cz.flipcom.listkomat --locales …`.
+  English shots: `settings put system time_12_24 12` so the clock matches "4:29 PM".
+- Status bar: SystemUI demo mode (`settings put global sysui_demo_allowed 1`,
+  then `am broadcast -a com.android.systemui.demo -e command …`: clock = the
+  real time so "Valid until" matches, battery 100, wifi full, mobile hidden,
+  notifications hidden). Re-apply after every restart.
+- Location: `adb emu geo fix 14.4213 50.0875` (Prague). The emulator's US SIM
+  shows the foreign-SIM notice; dismiss it with its ×.
+- Active ticket: tap a ticket → Messages opens → Back twice → "Ano, odesláno" →
+  "Potvrdit nyní". Notification shot: snooze the system notifications first
+  (`cmd notification snooze --for 3600000 '<key>'` from `cmd notification list`),
+  then `cmd statusbar expand-notifications`.
+- Set: countdown, live map with a tapped vehicle card, expanded notification,
+  dark map + dark list (Tmavý + Černá), Růžová theme, theme sheet.
