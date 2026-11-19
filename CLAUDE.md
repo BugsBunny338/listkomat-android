@@ -75,8 +75,9 @@ Details and the manual console steps are in [docs/play-launch.md](docs/play-laun
    listkomat-ios#38). Never hand-edit them.
 
 Play writes are Jiri's (and classifier-gated in auto mode). Merges are not:
-see the hub `CLAUDE.md` → Git flow. Closed
-track "Alpha" needs ~12 opted-in testers for 14 days before production.
+see the hub `CLAUDE.md` → Git flow. Since 2026-11-16 the Play account is an
+organization (3HC Advisory Group s.r.o.), so there is no 12-tester closed-test
+gate; 1.0 went to production on 2026-11-19 (hub `docs/play-console.md`).
 
 ## Rules learned the hard way
 
