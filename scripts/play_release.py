@@ -12,10 +12,11 @@ Usage:
   play_release.py release <track> [--notes-file F] [--name N]
         # uploads app/build/outputs/bundle/release/app-release.aab to <track>
         # (internal|alpha|beta|production), notes default to
-        # play/release-notes/<track>.txt if present
+        # play/release-notes/<track>.txt (cs-CZ) + <track>.en-US.txt (en-US) if present
   play_release.py promote <from> <to> [--notes-file F]
         # moves the newest release across tracks; notes are the DESTINATION
-        # track's (play/release-notes/<to>.txt), never carried over from <from>
+        # track's (play/release-notes/<to>.txt + <to>.en-US.txt), never carried
+        # over from <from>
   play_release.py listing <lang> [--dry-run]
         # uploads play/listing/<lang>/{title,short_description,full_description}.txt
         # as the store listing for <lang> (e.g. cs-CZ, en-US); diffs against the
@@ -70,15 +71,28 @@ def call(tok, method, url, data=None, content_type="application/json",
         sys.exit(f"ERROR {method} {url}\n{e.code}: {e.read().decode()[:500]}")
 
 
+NOTES_LIMIT = 500  # Play's per-language limit for "What's new"
+
+
 def notes_for(track: str, path: str | None):
+    """Release notes for a track: <base>.txt is cs-CZ (required), <base>.en-US.txt
+    is en-US (optional, sent when present). <base> defaults to
+    play/release-notes/<track>; --notes-file F uses F and its .en-US sibling."""
     if path is None:
-        default = os.path.join(os.path.dirname(__file__), os.pardir,
-                               "play", "release-notes", f"{track}.txt")
-        path = default if os.path.exists(default) else None
-    if path is None:
-        return None
-    text = open(path).read().strip()
-    return [{"language": "cs-CZ", "text": text}]
+        path = os.path.join(os.path.dirname(__file__), os.pardir,
+                            "play", "release-notes", f"{track}.txt")
+        if not os.path.exists(path):
+            return None
+    stem = path[:-len(".txt")] if path.endswith(".txt") else path
+    notes = []
+    for lang, file in (("cs-CZ", path), ("en-US", f"{stem}.en-US.txt")):
+        if lang != "cs-CZ" and not os.path.exists(file):
+            continue
+        text = open(file).read().strip()
+        if len(text) > NOTES_LIMIT:
+            sys.exit(f"ERROR: {file} is {len(text)} chars, over Play's {NOTES_LIMIT}")
+        notes.append({"language": lang, "text": text})
+    return notes
 
 
 def cmd_status():
