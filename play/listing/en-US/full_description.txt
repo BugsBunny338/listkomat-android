@@ -18,3 +18,4 @@ GOOD TO KNOW
 • SMS tickets require a Czech SIM card (premium SMS billed by your operator)
 • Price lists update automatically; the last known prices work offline too
 • No analytics, no tracking — the app collects no data
+• Also findable as Listkomat (without the accent)

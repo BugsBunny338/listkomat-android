@@ -18,3 +18,4 @@ DOBRÉ VĚDĚT
 • SMS jízdenky fungují s českou SIM kartou (premium SMS účtuje váš operátor)
 • Ceníky se aktualizují automaticky; poslední známý ceník funguje i offline
 • Žádná analytika, žádné sledování — appka nesbírá žádná data
+• V obchodě nás najdete i jako Listkomat (bez háčků a čárek)
