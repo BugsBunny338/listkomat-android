@@ -159,6 +159,12 @@ fun TicketListScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = if (staleHint) MaterialTheme.colorScheme.error else secondary,
                 )
+                // Down here, never above the rows: nothing may push the tickets
+                // under a thumb (a mis-tap is a real premium-SMS charge).
+                if (!city.showsLiveMap) {
+                    Text(stringResource(R.string.footer_no_live_map),
+                        style = MaterialTheme.typography.bodySmall, color = secondary)
+                }
             }
         }
     }

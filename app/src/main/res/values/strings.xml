@@ -62,6 +62,7 @@
     <string name="footer_sim_more">Více</string>
     <string name="footer_prices_as_of">Ceník platný k %1$s</string>
     <string name="footer_offline">Offline – zobrazen uložený ceník (k %1$s)</string>
+    <string name="footer_no_live_map">Pro toto město zatím živou mapu nemáme.</string>
     <string name="theme_clean">Čistý</string>
     <string name="theme_black">Černá</string>
     <string name="theme_pink">Růžová</string>
