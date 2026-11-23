@@ -1,89 +1,134 @@
 package cz.flipcom.listkomat.ui
 
+import android.content.Context
 import android.graphics.Paint
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.android.awaitFrame
-import kotlin.random.Random
+import androidx.core.graphics.createBitmap
+import cz.flipcom.listkomat.model.RainState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.ceil
 
 /**
  * The mascot-rain easter egg, ported from the iOS RainLayer: tapping the
  * mascot drops a burst of falling emoji; rapid taps pile up for a heavier
- * downpour. Positions derive from spawn time + elapsed time, so new bursts
- * never interrupt drops already falling. No frame loop runs while idle.
+ * downpour. The rules (burst size, cap, pruning, decay) live in [RainState].
+ *
+ * Drawing is kept cheap for low-end GPUs (android#1 item 3): each emoji is
+ * rasterised once into a bitmap and every drop just draws that bitmap under
+ * its transform; the overlay sits in its own graphics layer, so a frame only
+ * re-records the rain, not the screen under it; time comes from the Compose
+ * frame clock. Nothing is composed and no frame loop runs while idle, and
+ * touches pass through (no pointer input). With animations turned off the rain
+ * is skipped; battery saver makes it lighter.
  */
-private data class RainDrop(
-    val emoji: String,
-    val x: Float,          // 0..1 fraction of width
-    val scale: Float,
-    val spin: Float,       // total degrees over the fall
-    val durationMs: Long,
-    val startAt: Long,     // uptimeMillis when this drop begins falling
-)
-
 @Composable
 fun RainOverlay(trigger: Int, mascot: String?) {
-    var drops by remember { mutableStateOf(listOf<RainDrop>()) }
-    var recent by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    var rain by remember { mutableStateOf(RainState()) }
     var now by remember { mutableLongStateOf(0L) }
+    val scope = rememberCoroutineScope()
+    val idle by remember { derivedStateOf { rain.isIdle } }
 
     LaunchedEffect(trigger) {
         if (trigger == 0 || mascot == null) return@LaunchedEffect
-        val t = android.os.SystemClock.uptimeMillis()
-        recent += 1
-        val count = minOf(10 + recent * 6, 60)
-        drops = drops + List(count) {
-            RainDrop(
-                emoji = mascot,
-                x = Random.nextFloat() * 0.94f + 0.03f,
-                scale = Random.nextFloat() * 0.7f + 0.6f,
-                spin = Random.nextFloat() * 440f - 220f,
-                durationMs = (Random.nextFloat() * 1200 + 1600).toLong(),
-                startAt = t + (Random.nextFloat() * 500).toLong(),
-            )
+        // Read per tap, not per frame: cheap, and follows a change made while open.
+        if (!RainState.allowed(animatorDurationScale(context))) return@LaunchedEffect
+        val powerSave = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        // Spawn on the frame clock the drops are drawn with.
+        val t = withFrameMillis { it }
+        now = t
+        rain = rain.burst(mascot, t, powerSave)
+        // Outside this effect, which the next tap cancels.
+        scope.launch {
+            delay(RainState.DECAY_MS)
+            rain = rain.decay()
         }
     }
-    // One frame loop while anything is falling; drains and stops when done.
-    LaunchedEffect(drops.isNotEmpty()) {
-        while (drops.isNotEmpty()) {
-            awaitFrame()
-            val t = android.os.SystemClock.uptimeMillis()
+    // One frame loop while anything is falling; prunes as it goes, stops when done.
+    LaunchedEffect(idle) {
+        var frames = 0
+        while (!rain.isIdle) {
+            val t = withFrameMillis { it }
             now = t
-            if (drops.all { t > it.startAt + it.durationMs }) {
-                drops = emptyList()
-                recent = 0
+            frames += 1
+            if (frames % PRUNE_EVERY_FRAMES == 0 || rain.drops.all { it.isFinished(t) }) {
+                rain = rain.prune(t)
             }
         }
     }
-    if (drops.isEmpty()) return
+    if (idle) return
+
     val textPx = with(LocalDensity.current) { 36.sp.toPx() }
-    val paint = remember(textPx) { Paint().apply { textSize = textPx; textAlign = Paint.Align.CENTER } }
-    Canvas(Modifier.fillMaxSize()) {
+    val glyphs = remember(textPx) { GlyphCache(textPx * RASTER_SCALE) }
+    // `now` and `rain` are read only while drawing: a frame invalidates the
+    // draw of this layer, never composition.
+    Canvas(Modifier.fillMaxSize().graphicsLayer()) {
         val t = now
-        for (d in drops) {
-            val p = (t - d.startAt).toFloat() / d.durationMs
+        for (d in rain.drops) {
+            val p = d.progress(t)
             if (p < 0f || p > 1f) continue
             val eased = p * p    // gentle gravity-like acceleration
             val y = -60f + (size.height + 120f) * eased
-            drawContext.canvas.nativeCanvas.apply {
-                save()
+            val glyph = glyphs[d.emoji]
+            val s = d.scale / RASTER_SCALE
+            withTransform({
                 translate(d.x * size.width, y)
-                rotate(d.spin * p)
-                scale(d.scale, d.scale)
-                drawText(d.emoji, 0f, 0f, paint)
-                restore()
+                rotate(d.spin * p, pivot = Offset.Zero)
+                scale(s, s, pivot = Offset.Zero)
+            }) {
+                drawImage(glyph, topLeft = Offset(-glyph.width / 2f, -glyph.height / 2f))
             }
         }
+    }
+}
+
+/** How often the frame loop drops landed emoji between bursts. */
+private const val PRUNE_EVERY_FRAMES = 30
+
+/** The largest drop scale: glyphs are rasterised at it, so they only ever shrink. */
+private const val RASTER_SCALE = 1.3f
+
+private fun animatorDurationScale(context: Context): Float =
+    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+
+/** Each emoji rendered once to a bitmap, centred, with a little padding. */
+private class GlyphCache(textPx: Float) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        textSize = textPx
+        textAlign = Paint.Align.CENTER
+    }
+    private val bitmaps = HashMap<String, ImageBitmap>()
+
+    operator fun get(emoji: String): ImageBitmap = bitmaps.getOrPut(emoji) {
+        val metrics = paint.fontMetrics
+        val pad = 4
+        val w = ceil(paint.measureText(emoji)).toInt().coerceAtLeast(1) + 2 * pad
+        val h = ceil(metrics.descent - metrics.ascent).toInt().coerceAtLeast(1) + 2 * pad
+        val bitmap = createBitmap(w, h)
+        android.graphics.Canvas(bitmap).drawText(emoji, w / 2f, pad - metrics.ascent, paint)
+        bitmap.asImageBitmap()
     }
 }
