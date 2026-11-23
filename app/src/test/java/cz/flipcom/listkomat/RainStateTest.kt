@@ -87,6 +87,7 @@ class RainStateTest {
         assertSame(s, s.prune(0))
         val mid = s.prune(2_000)
         assertTrue(mid.drops.all { !it.isFinished(2_000) })
+        assertEquals(s.drops.count { !it.isFinished(2_000) }, mid.drops.size)
         assertTrue(s.prune(3_301).isIdle)
         assertEquals(s.recent, s.prune(3_301).recent)
     }
