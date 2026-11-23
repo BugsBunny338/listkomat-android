@@ -39,6 +39,39 @@ class ThemeSchemeTest {
         }
     }
 
+    // The filled buttons ("Vybrat město" in the empty state, "Pokračovat" in the
+    // location primer) are M3 Buttons: primary fill, onPrimary label. The sweep
+    // above is their check; iOS (P1 item 2a) now picks its label the same way.
+
+    @Test
+    fun `the ticket banner reads on every theme`() {
+        // ActiveTicketBanner: a primaryContainer card while pending/valid (its
+        // text takes onPrimaryContainer, the buttons primary), surfaceVariant
+        // once expired (onSurfaceVariant text, primary "Ukončit"). Nothing in
+        // it is orange or red, unlike the iOS banner (P1 item 2b).
+        for (theme in AppTheme.presets) for (dark in listOf(false, true)) {
+            val s = themedColorScheme(theme, dark)
+            for ((what, fg, bg) in listOf(
+                Triple("text", s.onPrimaryContainer, s.primaryContainer),
+                Triple("button", s.primary, s.primaryContainer),
+                Triple("expired text", s.onSurfaceVariant, s.surfaceVariant),
+                Triple("expired button", s.primary, s.surfaceVariant),
+            )) {
+                val r = ratio(fg, bg)
+                assertTrue("${theme.id} dark=$dark $what: $r", r >= 4.5)
+            }
+        }
+    }
+
+    @Test
+    fun `the offline footer's error red reads on the page`() {
+        for (theme in AppTheme.presets) for (dark in listOf(false, true)) {
+            val s = themedColorScheme(theme, dark)
+            val r = ratio(s.error, s.background)
+            assertTrue("${theme.id} dark=$dark: $r", r >= 4.5)
+        }
+    }
+
     @Test
     fun `the clean dark teal is untouched and keeps its ink label`() {
         val scheme = themedColorScheme(AppTheme.resolve("clean"), dark = true)
