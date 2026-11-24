@@ -63,20 +63,22 @@ class RainStateTest {
 
     @Test
     fun `live drops are capped at 100, falling drops never evicted`() {
-        var s = RainState()
-        repeat(4) { s = s.burst("🦄", now = 0, powerSave = false, random = random) } // 16+22+28+34
+        var s = RainState().burst("🦄", now = 0, powerSave = false, random = random) // 16, landed by 3_300
+        repeat(3) { s = s.burst("🦄", now = 1_500, powerSave = false, random = random) } // +22+28+34
         assertEquals(MAX_LIVE_DROPS, s.drops.size)
         // Past the cap a tap adds nothing and removes nothing.
-        val atCap = s.burst("🐸", now = 0, powerSave = false, random = random)
+        val atCap = s.burst("🐸", now = 1_500, powerSave = false, random = random)
         assertEquals(s.drops, atCap.drops)
-        // Once some have landed, a tap fills only the room they left.
-        val later = atCap.burst("🐸", now = 3_400, powerSave = false, random = random)
-        val stillFalling = s.drops.count { !it.isFinished(3_400) }
-        assertEquals(
-            minOf(RainState.burstSize(later.recent, powerSave = false), MAX_LIVE_DROPS - stillFalling),
-            later.drops.count { it.emoji == "🐸" },
-        )
-        assertTrue(later.drops.size <= MAX_LIVE_DROPS)
+        // At 3_350 the first burst has landed but almost all of the other 84 are
+        // still falling (they end at 3_100 at the earliest), so the room left is
+        // smaller than this tap's burst: the tap fills exactly that room.
+        // Evicting the oldest instead would add the whole burst.
+        val later = atCap.burst("🐸", now = 3_350, powerSave = false, random = random)
+        val room = MAX_LIVE_DROPS - s.drops.count { !it.isFinished(3_350) }
+        val frogs = later.drops.count { it.emoji == "🐸" }
+        assertEquals(MAX_LIVE_DROPS, later.drops.size)
+        assertEquals(room, frogs)
+        assertTrue(frogs < RainState.burstSize(later.recent, powerSave = false))
     }
 
     @Test
