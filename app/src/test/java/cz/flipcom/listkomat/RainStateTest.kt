@@ -62,14 +62,21 @@ class RainStateTest {
     }
 
     @Test
-    fun `live drops are capped at 100, newest kept`() {
+    fun `live drops are capped at 100, falling drops never evicted`() {
         var s = RainState()
-        repeat(10) { s = s.burst("🦄", now = 0, powerSave = false, random = random) }
+        repeat(4) { s = s.burst("🦄", now = 0, powerSave = false, random = random) } // 16+22+28+34
         assertEquals(MAX_LIVE_DROPS, s.drops.size)
-        val last = s.burst("🐸", now = 0, powerSave = false, random = random)
-        assertEquals(MAX_LIVE_DROPS, last.drops.size)
-        assertEquals(60, last.drops.count { it.emoji == "🐸" })
-        assertEquals("🐸", last.drops.last().emoji)
+        // Past the cap a tap adds nothing and removes nothing.
+        val atCap = s.burst("🐸", now = 0, powerSave = false, random = random)
+        assertEquals(s.drops, atCap.drops)
+        // Once some have landed, a tap fills only the room they left.
+        val later = atCap.burst("🐸", now = 3_400, powerSave = false, random = random)
+        val stillFalling = s.drops.count { !it.isFinished(3_400) }
+        assertEquals(
+            minOf(RainState.burstSize(later.recent, powerSave = false), MAX_LIVE_DROPS - stillFalling),
+            later.drops.count { it.emoji == "🐸" },
+        )
+        assertTrue(later.drops.size <= MAX_LIVE_DROPS)
     }
 
     @Test

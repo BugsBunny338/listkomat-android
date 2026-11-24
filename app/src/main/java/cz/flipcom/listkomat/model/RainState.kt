@@ -32,11 +32,15 @@ data class RainState(
 ) {
     val isIdle: Boolean get() = drops.isEmpty()
 
-    /** A new burst of [emoji] at [now]: finished drops go, the newest
-     *  [MAX_LIVE_DROPS] stay. Battery saver caps the burst at [POWER_SAVE_BURST]. */
+    /** A new burst of [emoji] at [now]: finished drops go, and the burst fills
+     *  only the room left under [MAX_LIVE_DROPS]. Drops already falling are never
+     *  evicted: keeping the newest instead wiped out the visible rain under rapid
+     *  taps, leaving only drops still above the top edge. Battery saver caps the
+     *  burst at [POWER_SAVE_BURST]. */
     fun burst(emoji: String, now: Long, powerSave: Boolean, random: Random = Random.Default): RainState {
         val nextRecent = recent + 1
-        val count = burstSize(nextRecent, powerSave)
+        val falling = drops.filterNot { it.isFinished(now) }
+        val count = minOf(burstSize(nextRecent, powerSave), maxOf(0, MAX_LIVE_DROPS - falling.size))
         val fresh = List(count) {
             RainDrop(
                 emoji = emoji,
@@ -47,8 +51,7 @@ data class RainState(
                 startAt = now + (random.nextFloat() * 500).toLong(),
             )
         }
-        val live = drops.filterNot { it.isFinished(now) } + fresh
-        return RainState(live.takeLast(MAX_LIVE_DROPS), nextRecent)
+        return RainState(falling + fresh, nextRecent)
     }
 
     /** Drops that have landed are gone; the same object when nothing changed. */
