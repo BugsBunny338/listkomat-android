@@ -1,1 +1,1 @@
-První veřejná verze Lístkomatu pro Android: SMS jízdenky pro 10 českých měst bez registrace, odpočet platnosti v oznámení a živá mapa spojů v Praze a Brně.
+Plynulejší déšť maskotů (při vypnutých animacích se nespustí) a u měst bez živé mapy to aplikace nově řekne pod seznamem lístků.

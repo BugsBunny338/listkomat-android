@@ -1,0 +1,1 @@
+A smoother mascot rain (it stays off when animations are turned off), and cities without a live map now say so under the ticket list.

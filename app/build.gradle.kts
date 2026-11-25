@@ -15,8 +15,8 @@ android {
         applicationId = "cz.flipcom.listkomat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.0"
+        versionCode = 9
+        versionName = "1.1"
     }
 
     // Upload-key signing from the gitignored keystore.properties (absent on
